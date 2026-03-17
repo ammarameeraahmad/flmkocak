@@ -4,12 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FLM Cam - PPT Overlay Recording</title>
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
-    
+
+    <!-- PeerJS -->
+    <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
     <style>
         * {
             margin: 0;
@@ -85,7 +83,7 @@
             box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
         }
 
-        /* Session ID Display */
+        /* Peer ID Display */
         .session-info {
             background: #2d2d44;
             padding: 15px;
@@ -103,6 +101,8 @@
             border-radius: 5px;
             display: inline-block;
             letter-spacing: 2px;
+            user-select: all;
+            cursor: pointer;
         }
 
         /* Main Content */
@@ -407,27 +407,17 @@
             to { transform: translateX(0); }
         }
 
-        /* Firebase Config Section */
-        .firebase-config {
-            background: #2d2d44;
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 20px;
-        }
-
-        .firebase-config input {
-            width: 100%;
-            padding: 12px;
-            margin-bottom: 10px;
+        .connect-input {
+            width: 200px;
+            padding: 8px;
+            margin-left: 10px;
             border: 1px solid #444;
-            border-radius: 8px;
+            border-radius: 5px;
             background: #1a1a2e;
             color: #fff;
             font-family: monospace;
-        }
-
-        .firebase-config input::placeholder {
-            color: #666;
+            letter-spacing: 1px;
+            text-transform: uppercase;
         }
     </style>
 </head>
@@ -435,43 +425,27 @@
     <div class="container">
         <!-- Header -->
         <div class="header">
-            <h1>📹 FLM Cam</h1>
+            <h1>FLM Cam</h1>
             <p>PPT Overlay Recording System - Record video dengan overlay PPT yang bisa di-resize</p>
-        </div>
-
-        <!-- Firebase Config (Hidden - using hardcoded config) -->
-        <div class="firebase-config hidden" id="firebaseConfigSection">
-            <h3>⚙️ Konfigurasi Firebase</h3>
-            <p style="color: #aaa; margin-bottom: 15px; font-size: 0.9rem;">Masukkan konfigurasi Firebase Anda untuk melanjutkan</p>
-            <input type="text" id="firebaseApiKey" placeholder="API Key">
-            <input type="text" id="firebaseProjectId" placeholder="Project ID">
-            <input type="text" id="firebaseStorageBucket" placeholder="Storage Bucket (mis: myproject.appspot.com)">
-            <button class="btn btn-primary" onclick="initializeFirebase()">Simpan & Mulai</button>
-            <p style="color: #888; font-size: 0.8rem; margin-top: 10px;">
-                ⚠️ Anda perlu membuat project di <a href="https://console.firebase.google.com" target="_blank" style="color: #667eea;">Firebase Console</a> 
-                dan mengaktifkan Realtime Database & Storage
-            </p>
         </div>
 
         <!-- Mode Selection -->
         <div class="mode-selection" id="modeSelection">
-            <button class="mode-btn phone active" onclick="selectMode('phone')">📱 Mode HP (Kamera)</button>
-            <button class="mode-btn laptop" onclick="selectMode('laptop')">💻 Mode Laptop (Monitor)</button>
+            <button class="mode-btn phone" onclick="selectMode('phone')">Mode HP (Kamera)</button>
+            <button class="mode-btn laptop" onclick="selectMode('laptop')">Mode Laptop (Monitor)</button>
         </div>
 
-        <!-- Session Info -->
+        <!-- Peer ID Display -->
         <div class="session-info hidden" id="sessionInfo">
-            <p>Session ID:</p>
-            <div class="session-id" id="sessionIdDisplay">-</div>
-            <p style="margin-top: 10px; color: #aaa; font-size: 0.9rem;">
-                Bagikan ID ini ke perangkat lain untuk terhubung
-            </p>
-            <button class="btn btn-primary" style="width: auto; margin-top: 10px;" onclick="joinSession()">
-                Gabung Session
-            </button>
-            <input type="text" id="joinSessionId" placeholder="Masukkan Session ID" 
-                   style="width: 200px; padding: 8px; margin-left: 10px; border: 1px solid #444; 
-                          border-radius: 5px; background: #1a1a2e; color: #fff;">
+            <p>Peer ID Anda (klik untuk copy):</p>
+            <div class="session-id" id="peerIdDisplay" onclick="copyPeerId()">Menghubungkan...</div>
+            <p style="margin-top: 10px; color: #aaa; font-size: 0.9rem;" id="sessionHint"></p>
+            <div id="connectSection" class="hidden" style="margin-top: 10px;">
+                <input type="text" id="remotePeerId" placeholder="Masukkan Peer ID HP" class="connect-input">
+                <button class="btn btn-primary" style="width: auto; margin-top: 10px;" onclick="connectToPeer()">
+                    Sambung
+                </button>
+            </div>
         </div>
 
         <!-- Main Content -->
@@ -481,41 +455,38 @@
                 <div class="video-container">
                     <video id="videoElement" autoplay playsinline muted></video>
                     <video id="remoteVideo" autoplay playsinline class="hidden"></video>
-                    
+
                     <!-- PPT Overlay -->
                     <div id="pptOverlay">
                         <img id="pptImage" src="" alt="PPT Slide">
-                        <div class="resize-handle">↘</div>
+                        <div class="resize-handle">&#8600;</div>
                     </div>
-                    
+
                     <!-- Recording Indicator -->
                     <div class="recording-indicator" id="recordingIndicator">
-                        <span>●</span> REC
+                        <span>&#9679;</span> REC
                     </div>
                 </div>
 
                 <!-- Phone Controls -->
                 <div id="phoneControls" class="hidden">
                     <button class="btn btn-success" id="startCameraBtn" onclick="startCamera()">
-                        🎥 Mulai Kamera
+                        Mulai Kamera
                     </button>
                     <button class="btn btn-danger" id="recordBtn" onclick="toggleRecording()" disabled>
-                        ⏺ Mulai Rekam
+                        Mulai Rekam
                     </button>
                 </div>
 
                 <!-- Laptop Controls -->
                 <div id="laptopControls" class="hidden">
-                    <button class="btn btn-primary" id="connectBtn" onclick="connectToPhone()">
-                        🔗 Sambung ke HP
-                    </button>
                 </div>
             </div>
 
             <!-- Controls Panel -->
             <div class="controls-panel">
                 <!-- Status -->
-                <div class="panel-title">📊 Status</div>
+                <div class="panel-title">Status</div>
                 <div class="status disconnected" id="statusIndicator">
                     <div class="status-dot"></div>
                     <span id="statusText">Tidak terhubung</span>
@@ -523,12 +494,12 @@
 
                 <!-- PPT Controls (Laptop only) -->
                 <div id="pptControls" class="hidden">
-                    <div class="panel-title">📊 Kontrol PPT</div>
-                    
+                    <div class="panel-title">Kontrol PPT</div>
+
                     <div class="control-group">
                         <label class="control-label">Upload Slide PPT</label>
                         <div class="file-input-wrapper">
-                            <button class="btn btn-warning">📁 Pilih File Gambar</button>
+                            <button class="btn btn-warning">Pilih File Gambar</button>
                             <input type="file" id="pptFileInput" accept="image/*" multiple onchange="handlePPTUpload(event)">
                         </div>
                         <p style="color: #666; font-size: 0.8rem; margin-top: 5px;">
@@ -540,8 +511,8 @@
                         <label class="control-label">Slide Saat Ini</label>
                         <div class="slide-counter" id="slideCounter">0 / 0</div>
                         <div class="slide-nav">
-                            <button onclick="prevSlide()">◀</button>
-                            <button onclick="nextSlide()">▶</button>
+                            <button onclick="prevSlide()">&#9664;</button>
+                            <button onclick="nextSlide()">&#9654;</button>
                         </div>
                     </div>
 
@@ -566,13 +537,13 @@
                     </div>
 
                     <button class="btn btn-primary" onclick="resetPPTPosition()">
-                        🔄 Reset Posisi
+                        Reset Posisi
                     </button>
                 </div>
 
                 <!-- Recording Info (Phone only) -->
                 <div id="recordingControls" class="hidden">
-                    <div class="panel-title">⏺ Info Rekaman</div>
+                    <div class="panel-title">Info Rekaman</div>
                     <p style="color: #aaa; font-size: 0.9rem;">
                         Video akan disimpan di perangkat HP Anda setelah recording selesai.
                     </p>
@@ -585,28 +556,14 @@
     <div class="toast hidden" id="toast"></div>
 
     <script>
-        // ==================== FIREBASE CONFIGURATION ====================
-        // Direct Firebase configuration - no need to input manually
-        const firebaseConfig = {
-            apiKey: "AIzaSyDwr0bJV06ctuuI615aWz5kGuZstP7ILug",
-            authDomain: "project-62a639d3-174c-4a7e-809.firebaseapp.com",
-            databaseURL: "https://project-62a639d3-174c-4a7e-809-default-rtdb.asia-southeast1.firebasedatabase.app",
-            projectId: "project-62a639d3-174c-4a7e-809",
-            storageBucket: "project-62a639d3-174c-4a7e-809.firebasestorage.app",
-            messagingSenderId: "882945089103",
-            appId: "1:882945089103:web:fa6e25327dd35c8884543a",
-            measurementId: "G-V0XWPCCGBW"
-        };
-
         // ==================== GLOBAL VARIABLES ====================
-        let firebaseApp = null;
-        let db = null;
-        let storage = null;
+        let peer = null;
         let currentMode = null;
         let mediaStream = null;
         let mediaRecorder = null;
         let recordedChunks = [];
         let isRecording = false;
+        let activeCall = null;
 
         // PPT State
         let pptSlides = [];
@@ -619,53 +576,61 @@
             y: 0
         };
 
-        // WebRTC
-        let peerConnection = null;
-        const iceServers = {
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-            ]
-        };
+        // ==================== PEERJS INIT ====================
+        function initPeer() {
+            // Generate short random ID
+            const shortId = 'flm-' + Math.random().toString(36).substring(2, 8);
 
-        // Check if Firebase is already initialized
-        function checkFirebaseConfig() {
-            // Initialize Firebase directly with pre-configured values
-            initializeFirebase();
+            peer = new Peer(shortId);
+
+            peer.on('open', (id) => {
+                document.getElementById('peerIdDisplay').textContent = id;
+                console.log('PeerJS connected! ID:', id);
+            });
+
+            peer.on('error', (err) => {
+                console.error('PeerJS error:', err);
+                if (err.type === 'unavailable-id') {
+                    // ID taken, retry with different ID
+                    initPeer();
+                    return;
+                }
+                showToast('Koneksi error: ' + err.message, 'error');
+            });
+
+            // Phone mode: listen for incoming calls
+            peer.on('call', (call) => {
+                if (currentMode === 'phone' && mediaStream) {
+                    call.answer(mediaStream);
+                    activeCall = call;
+                    updateStatus('connected', 'Laptop terhubung!');
+                    showToast('Laptop berhasil terhubung!', 'success');
+
+                    call.on('close', () => {
+                        updateStatus('disconnected', 'Laptop terputus');
+                    });
+                }
+            });
+
+            // Listen for data connections (for PPT sync)
+            peer.on('connection', (conn) => {
+                setupDataConnection(conn);
+            });
         }
 
-        // ==================== FIREBASE ====================
-        function initializeFirebase() {
-            // Initialize Firebase with pre-configured config
-            firebaseApp = firebase.initializeApp(firebaseConfig);
-            db = firebase.database();
-            
-            // Try to get storage (may fail if not enabled)
-            try {
-                storage = firebase.storage();
-            } catch (e) {
-                console.log('Storage not available:', e);
+        function copyPeerId() {
+            const peerId = document.getElementById('peerIdDisplay').textContent;
+            if (peerId && peerId !== 'Menghubungkan...') {
+                navigator.clipboard.writeText(peerId).then(() => {
+                    showToast('Peer ID disalin!', 'success');
+                });
             }
-
-            // Hide config section and show main UI
-            document.getElementById('firebaseConfigSection').classList.add('hidden');
-            document.getElementById('sessionInfo').classList.remove('hidden');
-            
-            // Generate session ID
-            sessionId = generateSessionId();
-            document.getElementById('sessionIdDisplay').textContent = sessionId;
-            
-            console.log('Firebase initialized successfully!');
-        }
-
-        function generateSessionId() {
-            return Math.random().toString(36).substring(2, 8).toUpperCase();
         }
 
         // ==================== MODE SELECTION ====================
         function selectMode(mode) {
             currentMode = mode;
-            
+
             // Update buttons
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector(`.mode-btn.${mode}`).classList.add('active');
@@ -676,23 +641,27 @@
             document.getElementById('pptControls').classList.toggle('hidden', mode !== 'laptop');
             document.getElementById('recordingControls').classList.toggle('hidden', mode !== 'phone');
 
-            // Show main content
+            // Show session info and main content
+            document.getElementById('sessionInfo').classList.remove('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
+
+            // Mode-specific UI
+            if (mode === 'phone') {
+                document.getElementById('sessionHint').textContent =
+                    'Bagikan Peer ID ini ke laptop untuk terhubung';
+                document.getElementById('connectSection').classList.add('hidden');
+            } else {
+                document.getElementById('sessionHint').textContent =
+                    'Masukkan Peer ID dari HP untuk menerima video';
+                document.getElementById('connectSection').classList.remove('hidden');
+            }
 
             // Make overlay draggable in laptop mode
             document.getElementById('pptOverlay').classList.toggle('draggable', mode === 'laptop');
-        }
 
-        function joinSession() {
-            const joinId = document.getElementById('joinSessionId').value.trim().toUpperCase();
-            if (joinId) {
-                sessionId = joinId;
-                document.getElementById('sessionIdDisplay').textContent = sessionId;
-                showToast(`Bergabung ke session ${sessionId}`, 'success');
-                
-                if (currentMode === 'laptop') {
-                    connectToPhone();
-                }
+            // Initialize peer if not yet
+            if (!peer) {
+                initPeer();
             }
         }
 
@@ -706,21 +675,117 @@
 
                 const videoElement = document.getElementById('videoElement');
                 videoElement.srcObject = mediaStream;
-                
+
                 document.getElementById('startCameraBtn').disabled = true;
                 document.getElementById('recordBtn').disabled = false;
 
-                // Setup WebRTC for streaming
-                if (currentMode === 'phone') {
-                    setupPhonePeerConnection();
-                }
-
-                updateStatus('connected', 'Kamera aktif');
+                updateStatus('connected', 'Kamera aktif - menunggu laptop');
                 showToast('Kamera berhasil dimulai!', 'success');
             } catch (error) {
                 console.error('Camera error:', error);
                 showToast('Gagal mengakses kamera: ' + error.message, 'error');
             }
+        }
+
+        // ==================== CONNECT (LAPTOP MODE) ====================
+        let dataConn = null;
+
+        function connectToPeer() {
+            const remotePeerId = document.getElementById('remotePeerId').value.trim();
+            if (!remotePeerId) {
+                showToast('Masukkan Peer ID HP terlebih dahulu!', 'error');
+                return;
+            }
+
+            updateStatus('connecting', 'Menyambungkan ke HP...');
+
+            // Video call
+            const call = peer.call(remotePeerId, createEmptyStream());
+            activeCall = call;
+
+            call.on('stream', (remoteStream) => {
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.srcObject = remoteStream;
+                remoteVideo.classList.remove('hidden');
+                document.getElementById('videoElement').classList.add('hidden');
+                updateStatus('connected', 'Terhubung ke HP');
+                showToast('Berhasil terhubung!', 'success');
+            });
+
+            call.on('close', () => {
+                updateStatus('disconnected', 'Koneksi terputus');
+            });
+
+            call.on('error', (err) => {
+                console.error('Call error:', err);
+                updateStatus('disconnected', 'Gagal menyambung');
+                showToast('Gagal menyambung: ' + err.message, 'error');
+            });
+
+            // Data connection for PPT sync
+            dataConn = peer.connect(remotePeerId);
+            setupDataConnection(dataConn);
+        }
+
+        // Create empty media stream (needed to initiate call from laptop)
+        function createEmptyStream() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1;
+            canvas.height = 1;
+            return canvas.captureStream(1);
+        }
+
+        // ==================== DATA CONNECTION (PPT SYNC) ====================
+        function setupDataConnection(conn) {
+            conn.on('open', () => {
+                dataConn = conn;
+                console.log('Data connection established');
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'ppt-state') {
+                    // Update local PPT state from remote
+                    pptState.scale = data.scale || 1;
+                    pptState.opacity = data.opacity || 0.8;
+                    pptState.x = data.x || 0;
+                    pptState.y = data.y || 0;
+
+                    if (data.visible) {
+                        document.getElementById('pptOverlay').style.display = 'block';
+                    }
+
+                    // Apply styles
+                    const pptImg = document.getElementById('pptImage');
+                    pptImg.style.width = (pptState.scale * 100) + '%';
+                    pptImg.style.opacity = pptState.opacity;
+                    document.getElementById('pptOverlay').style.transform =
+                        `translate(${pptState.x}px, ${pptState.y}px)`;
+
+                    // Update UI sliders
+                    document.getElementById('pptScale').value = pptState.scale * 100;
+                    document.getElementById('scaleValue').textContent = Math.round(pptState.scale * 100) + '%';
+                    document.getElementById('pptOpacity').value = pptState.opacity * 100;
+                    document.getElementById('opacityValue').textContent = Math.round(pptState.opacity * 100) + '%';
+                    document.getElementById('pptPosX').value = pptState.x;
+                    document.getElementById('posXValue').textContent = pptState.x;
+                    document.getElementById('pptPosY').value = pptState.y;
+                    document.getElementById('posYValue').textContent = pptState.y;
+                }
+            });
+        }
+
+        function syncPPTState() {
+            if (!dataConn || !dataConn.open) return;
+
+            dataConn.send({
+                type: 'ppt-state',
+                currentSlide: currentSlideIndex,
+                scale: pptState.scale,
+                opacity: pptState.opacity,
+                x: pptState.x,
+                y: pptState.y,
+                visible: pptState.visible
+            });
         }
 
         // ==================== RECORDING ====================
@@ -741,40 +806,36 @@
             // Create canvas stream with overlay
             const canvas = document.createElement('canvas');
             const video = document.getElementById('videoElement');
-            const overlay = document.getElementById('pptOverlay');
-            
+
             canvas.width = video.videoWidth || 1280;
             canvas.height = video.videoHeight || 720;
-            
+
             const ctx = canvas.getContext('2d');
 
-            // Draw video frame
             function drawFrame() {
                 if (!isRecording) return;
-                
+
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                
+
                 // Draw overlay if visible
                 if (pptState.visible) {
                     ctx.globalAlpha = pptState.opacity;
                     const scale = pptState.scale;
                     const x = pptState.x + (canvas.width - canvas.width * scale) / 2;
                     const y = pptState.y + 20;
-                    
+
                     const pptImg = document.getElementById('pptImage');
                     if (pptImg.src && pptImg.complete) {
                         ctx.drawImage(pptImg, x, y, canvas.width * scale, canvas.height * scale);
                     }
                     ctx.globalAlpha = 1;
                 }
-                
+
                 requestAnimationFrame(drawFrame);
             }
 
-            // Create stream from canvas
             const canvasStream = canvas.captureStream(30);
-            
-            // Add audio track
+
             if (mediaStream.getAudioTracks().length > 0) {
                 canvasStream.addTrack(mediaStream.getAudioTracks()[0]);
             }
@@ -784,7 +845,7 @@
             });
 
             recordedChunks = [];
-            
+
             mediaRecorder.ondataavailable = (e) => {
                 if (e.data.size > 0) {
                     recordedChunks.push(e.data);
@@ -792,18 +853,15 @@
             };
 
             mediaRecorder.onstop = saveRecording;
-
             mediaRecorder.start(1000);
             isRecording = true;
-
-            // Start drawing
             drawFrame();
 
-            document.getElementById('recordBtn').textContent = '⏹ Stop Rekam';
+            document.getElementById('recordBtn').textContent = 'Stop Rekam';
             document.getElementById('recordBtn').classList.remove('btn-success');
             document.getElementById('recordBtn').classList.add('btn-danger');
             document.getElementById('recordingIndicator').classList.add('active');
-            
+
             updateStatus('connected', 'Merekam...');
             showToast('Mulai merekam!', 'success');
         }
@@ -812,14 +870,14 @@
             if (mediaRecorder && mediaRecorder.state !== 'inactive') {
                 mediaRecorder.stop();
             }
-            
+
             isRecording = false;
-            
-            document.getElementById('recordBtn').textContent = '⏺ Mulai Rekam';
+
+            document.getElementById('recordBtn').textContent = 'Mulai Rekam';
             document.getElementById('recordBtn').classList.remove('btn-danger');
             document.getElementById('recordBtn').classList.add('btn-success');
             document.getElementById('recordingIndicator').classList.remove('active');
-            
+
             updateStatus('connected', 'Kamera aktif');
             showToast('Rekaman selesai!', 'success');
         }
@@ -827,135 +885,15 @@
         function saveRecording() {
             const blob = new Blob(recordedChunks, { type: 'video/webm' });
             const url = URL.createObjectURL(blob);
-            
-            // Create download link
+
             const a = document.createElement('a');
             a.href = url;
             a.download = `FLM_Cam_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            
+
             showToast('Video berhasil diunduh!', 'success');
-        }
-
-        // ==================== WEBRTC ====================
-        function setupPhonePeerConnection() {
-            peerConnection = new RTCPeerConnection(iceServers);
-            
-            // Add local tracks
-            mediaStream.getTracks().forEach(track => {
-                peerConnection.addTrack(track, mediaStream);
-            });
-
-            // Handle incoming tracks
-            peerConnection.ontrack = (event) => {
-                const remoteVideo = document.getElementById('remoteVideo');
-                remoteVideo.srcObject = event.streams[0];
-            };
-
-            // Handle ICE candidates
-            peerConnection.onicecandidate = (event) => {
-                if (event.candidate) {
-                    db.ref(`sessions/${sessionId}/phone_ice`).push(event.candidate.toJSON());
-                }
-            };
-
-            // Listen for laptop ICE
-            db.ref(`sessions/${sessionId}/laptop_ice`).on('child_added', async (snapshot) => {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
-            });
-
-            // Create offer
-            peerConnection.createOffer().then(offer => {
-                peerConnection.setLocalDescription(offer);
-                db.ref(`sessions/${sessionId}`).update({
-                    phone_offer: offer,
-                    status: 'waiting'
-                });
-            });
-
-            // Listen for answer
-            db.ref(`sessions/${sessionId}/laptop_answer`).on('value', async (snapshot) => {
-                if (snapshot.val()) {
-                    await peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
-                }
-            });
-        }
-
-        async function connectToPhone() {
-            try {
-                updateStatus('connecting', 'Menyambungkan...');
-                showToast('Menunggu HP terhubung...', 'success');
-
-                // Listen for phone offer - use 'on' to wait if phone hasn't connected yet
-                db.ref(`sessions/${sessionId}/phone_offer`).on('value', async (snapshot) => {
-                    const offer = snapshot.val();
-                    if (!offer) {
-                        updateStatus('connecting', 'Menunggu HP menyiarkan kamera...');
-                        return;
-                    }
-
-                    // Stop listening once we have the offer
-                    db.ref(`sessions/${sessionId}/phone_offer`).off('value');
-
-                    try {
-                        // Create new peer connection
-                        if (peerConnection) {
-                            peerConnection.close();
-                        }
-                        peerConnection = new RTCPeerConnection(iceServers);
-
-                        peerConnection.ontrack = (event) => {
-                            const remoteVideo = document.getElementById('remoteVideo');
-                            remoteVideo.srcObject = event.streams[0];
-                            remoteVideo.classList.remove('hidden');
-                            document.getElementById('videoElement').classList.add('hidden');
-                            updateStatus('connected', 'Terhubung ke HP');
-                        };
-
-                        peerConnection.onicecandidate = (event) => {
-                            if (event.candidate) {
-                                db.ref(`sessions/${sessionId}/laptop_ice`).push(event.candidate.toJSON());
-                            }
-                        };
-
-                        peerConnection.onconnectionstatechange = () => {
-                            if (peerConnection.connectionState === 'disconnected' ||
-                                peerConnection.connectionState === 'failed') {
-                                updateStatus('disconnected', 'Koneksi terputus');
-                            }
-                        };
-
-                        // Set remote description (phone's offer)
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-
-                        // Create and set answer
-                        const answer = await peerConnection.createAnswer();
-                        await peerConnection.setLocalDescription(answer);
-                        db.ref(`sessions/${sessionId}`).update({
-                            laptop_answer: { type: answer.type, sdp: answer.sdp }
-                        });
-
-                        // NOW listen for phone ICE candidates (after remote desc is set)
-                        db.ref(`sessions/${sessionId}/phone_ice`).on('child_added', async (snapshot) => {
-                            try {
-                                await peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
-                            } catch (e) {
-                                console.warn('ICE candidate error:', e);
-                            }
-                        });
-
-                        updateStatus('connecting', 'Menghubungkan peer...');
-                    } catch (err) {
-                        console.error('WebRTC setup error:', err);
-                        updateStatus('disconnected', 'Gagal setup WebRTC');
-                    }
-                });
-            } catch (error) {
-                console.error('Connection error:', error);
-                updateStatus('disconnected', 'Gagal menyambungkan');
-            }
         }
 
         // ==================== PPT CONTROLS ====================
@@ -966,21 +904,19 @@
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const reader = new FileReader();
-                
+
                 reader.onload = (e) => {
                     pptSlides.push(e.target.result);
                     updateSlideCounter();
-                    
-                    // Show first slide
+
                     if (pptSlides.length === 1) {
                         showSlide(0);
                     }
-                    
-                    // Sync to Firebase
+
                     syncPPTState();
                     showToast(`Slide ${pptSlides.length} diupload!`, 'success');
                 };
-                
+
                 reader.readAsDataURL(file);
             }
         }
@@ -1009,17 +945,14 @@
         }
 
         function updateSlideCounter() {
-            document.getElementById('slideCounter').textContent = 
+            document.getElementById('slideCounter').textContent =
                 `${currentSlideIndex + 1} / ${pptSlides.length}`;
         }
 
         function updatePPTScale(value) {
             pptState.scale = value / 100;
             document.getElementById('scaleValue').textContent = value + '%';
-            
-            const pptImg = document.getElementById('pptImage');
-            pptImg.style.width = (pptState.scale * 100) + '%';
-            
+            document.getElementById('pptImage').style.width = (pptState.scale * 100) + '%';
             syncPPTState();
         }
 
@@ -1033,13 +966,13 @@
         function updatePPTPosition() {
             pptState.x = parseInt(document.getElementById('pptPosX').value);
             pptState.y = parseInt(document.getElementById('pptPosY').value);
-            
+
             document.getElementById('posXValue').textContent = pptState.x;
             document.getElementById('posYValue').textContent = pptState.y;
-            
-            document.getElementById('pptOverlay').style.transform = 
+
+            document.getElementById('pptOverlay').style.transform =
                 `translate(${pptState.x}px, ${pptState.y}px)`;
-            
+
             syncPPTState();
         }
 
@@ -1048,69 +981,17 @@
             pptState.opacity = 0.8;
             pptState.x = 0;
             pptState.y = 0;
-            
+
             document.getElementById('pptScale').value = 100;
             document.getElementById('pptOpacity').value = 80;
             document.getElementById('pptPosX').value = 0;
             document.getElementById('pptPosY').value = 0;
-            
+
             updatePPTScale(100);
             updatePPTOpacity(80);
             updatePPTPosition();
-            
+
             showToast('Posisi PPT direset!', 'success');
-        }
-
-        // ==================== FIREBASE SYNC ====================
-        function syncPPTState() {
-            if (!db || !sessionId) return;
-            
-            db.ref(`sessions/${sessionId}/ppt`).update({
-                currentSlide: currentSlideIndex,
-                scale: pptState.scale,
-                opacity: pptState.opacity,
-                x: pptState.x,
-                y: pptState.y,
-                visible: pptState.visible
-            });
-        }
-
-        function listenForPPTUpdates() {
-            if (!db || !sessionId) return;
-            
-            db.ref(`sessions/${sessionId}/ppt`).on('value', (snapshot) => {
-                const data = snapshot.val();
-                if (!data) return;
-                
-                // Update local state
-                pptState.scale = data.scale || 1;
-                pptState.opacity = data.opacity || 0.8;
-                pptState.x = data.x || 0;
-                pptState.y = data.y || 0;
-                
-                // Update UI
-                if (data.visible) {
-                    document.getElementById('pptOverlay').style.display = 'block';
-                }
-                
-                document.getElementById('pptScale').value = pptState.scale * 100;
-                document.getElementById('scaleValue').textContent = Math.round(pptState.scale * 100) + '%';
-                
-                document.getElementById('pptOpacity').value = pptState.opacity * 100;
-                document.getElementById('opacityValue').textContent = Math.round(pptState.opacity * 100) + '%';
-                
-                document.getElementById('pptPosX').value = pptState.x;
-                document.getElementById('posXValue').textContent = pptState.x;
-                document.getElementById('pptPosY').value = pptState.y;
-                document.getElementById('posYValue').textContent = pptState.y;
-                
-                // Apply styles
-                const pptImg = document.getElementById('pptImage');
-                pptImg.style.width = (pptState.scale * 100) + '%';
-                pptImg.style.opacity = pptState.opacity;
-                document.getElementById('pptOverlay').style.transform = 
-                    `translate(${pptState.x}px, ${pptState.y}px)`;
-            });
         }
 
         // ==================== DRAG FUNCTIONALITY ====================
@@ -1127,16 +1008,16 @@
 
         document.addEventListener('mousemove', (e) => {
             if (!isDragging || currentMode !== 'laptop') return;
-            
+
             pptState.x = e.clientX - dragStart.x;
             pptState.y = e.clientY - dragStart.y;
-            
+
             document.getElementById('pptPosX').value = pptState.x;
             document.getElementById('posXValue').textContent = pptState.x;
             document.getElementById('pptPosY').value = pptState.y;
             document.getElementById('posYValue').textContent = pptState.y;
-            
-            document.getElementById('pptOverlay').style.transform = 
+
+            document.getElementById('pptOverlay').style.transform =
                 `translate(${pptState.x}px, ${pptState.y}px)`;
         });
 
@@ -1151,7 +1032,7 @@
         function updateStatus(status, text) {
             const indicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('statusText');
-            
+
             indicator.className = 'status ' + status;
             statusText.textContent = text;
         }
@@ -1161,14 +1042,11 @@
             toast.textContent = message;
             toast.style.background = type === 'error' ? '#f44336' : '#4CAF50';
             toast.classList.remove('hidden');
-            
+
             setTimeout(() => {
                 toast.classList.add('hidden');
             }, 3000);
         }
-
-        // Initialize
-        checkFirebaseConfig();
     </script>
 </body>
 </html>
