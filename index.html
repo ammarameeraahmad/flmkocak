@@ -345,6 +345,55 @@
             line-height: 1.5;
             margin-bottom: 10px;
         }
+
+        .flip-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .flip-controls button {
+            flex: 1;
+            padding: 10px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+        }
+
+        .flip-controls button:hover { background: #333; }
+        .flip-controls button.active { background: #667eea; border-color: #667eea; }
+
+        .recording-preview {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .recording-preview video {
+            max-width: 90%;
+            max-height: 60vh;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .preview-buttons {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .preview-buttons .btn { width: auto; padding: 12px 30px; }
     </style>
 </head>
 <body>
@@ -400,6 +449,10 @@
 
                 <div id="phoneControls" class="hidden">
                     <button class="btn btn-success" id="startCameraBtn" onclick="startCamera()">Mulai Kamera</button>
+                    <div class="flip-controls">
+                        <button id="flipHBtn" onclick="toggleFlip('h')">&#8596; Mirror Horizontal</button>
+                        <button id="flipVBtn" onclick="toggleFlip('v')">&#8597; Mirror Vertical</button>
+                    </div>
                     <button class="btn btn-danger" id="recordBtn" onclick="toggleRecording()" disabled>Mulai Rekam</button>
                 </div>
 
@@ -462,6 +515,16 @@
 
     <div class="toast hidden" id="toast"></div>
 
+    <div class="recording-preview hidden" id="recordingPreview">
+        <h2 style="margin-bottom: 15px;">Hasil Rekaman</h2>
+        <video id="previewVideo" controls playsinline></video>
+        <div class="preview-buttons">
+            <button class="btn btn-success" onclick="downloadRecording()">Download</button>
+            <button class="btn btn-primary hidden" id="shareBtn" onclick="shareRecording()">Share</button>
+            <button class="btn btn-danger" onclick="closePreview()">Tutup</button>
+        </div>
+    </div>
+
     <script>
         // ==================== GLOBAL VARIABLES ====================
         let peer = null;
@@ -480,6 +543,9 @@
             opacity: 0.7
         };
 
+        // Mirror/Flip State
+        let flipState = { h: false, v: false };
+
         // Perspective corners (as fraction of container, 0-1)
         let corners = {
             tl: { x: 0.1, y: 0.1 },
@@ -487,6 +553,19 @@
             br: { x: 0.9, y: 0.9 },
             bl: { x: 0.1, y: 0.9 }
         };
+
+        // PPT image received from laptop (for recording composite)
+        let receivedPptImage = new Image();
+        let receivedPptReady = false;
+
+        // Recording preview
+        let lastRecordingBlob = null;
+        let lastRecordingFilename = '';
+
+        // WebGL renderer for PPT compositing
+        let glCanvas = null, gl = null, glProgram = null;
+        let glTexture = null, glPositionBuffer = null, glTexCoordBuffer = null;
+        let glReady = false;
 
         // ==================== PEERJS INIT ====================
         function initPeer() {
@@ -591,6 +670,32 @@
             }
         }
 
+        // ==================== MIRROR / FLIP ====================
+        function toggleFlip(axis) {
+            flipState[axis] = !flipState[axis];
+            applyFlipCSS();
+
+            document.getElementById(axis === 'h' ? 'flipHBtn' : 'flipVBtn')
+                .classList.toggle('active', flipState[axis]);
+
+            syncFlipState();
+        }
+
+        function applyFlipCSS() {
+            const sx = flipState.h ? -1 : 1;
+            const sy = flipState.v ? -1 : 1;
+            document.getElementById('videoElement').style.transform = `scaleX(${sx}) scaleY(${sy})`;
+        }
+
+        function syncFlipState() {
+            if (!dataConn || !dataConn.open) return;
+            dataConn.send({
+                type: 'flip-state',
+                flipH: flipState.h,
+                flipV: flipState.v
+            });
+        }
+
         // ==================== CONNECT (LAPTOP MODE) ====================
         let dataConn = null;
 
@@ -663,11 +768,30 @@
                         document.getElementById('pptOverlay').style.display = 'block';
                     }
 
+                    // Receive slide image for recording composite
+                    if (data.slideDataUrl) {
+                        receivedPptReady = false;
+                        receivedPptImage.onload = () => {
+                            receivedPptReady = true;
+                            if (glReady) updateGLTexture(receivedPptImage);
+                        };
+                        receivedPptImage.src = data.slideDataUrl;
+                        // Also show on phone's preview overlay
+                        document.getElementById('pptImage').src = data.slideDataUrl;
+                    }
+
                     document.getElementById('pptImage').style.opacity = pptState.opacity;
                     document.getElementById('pptOpacity').value = pptState.opacity * 100;
                     document.getElementById('opacityValue').textContent = Math.round(pptState.opacity * 100) + '%';
 
                     applyPerspective();
+                }
+
+                if (data.type === 'flip-state') {
+                    // Laptop receives flip state from phone - apply to remoteVideo
+                    const sx = data.flipH ? -1 : 1;
+                    const sy = data.flipV ? -1 : 1;
+                    document.getElementById('remoteVideo').style.transform = `scaleX(${sx}) scaleY(${sy})`;
                 }
             });
         }
@@ -675,13 +799,163 @@
         function syncPPTState() {
             if (!dataConn || !dataConn.open) return;
 
-            dataConn.send({
+            const payload = {
                 type: 'ppt-state',
                 currentSlide: currentSlideIndex,
                 opacity: pptState.opacity,
                 corners: corners,
                 visible: pptState.visible
-            });
+            };
+
+            // Send slide image data to phone for recording composite
+            if (pptSlides.length > 0 && currentSlideIndex < pptSlides.length) {
+                payload.slideDataUrl = pptSlides[currentSlideIndex];
+            }
+
+            dataConn.send(payload);
+        }
+
+        // ==================== WEBGL PPT RENDERER ====================
+        function initGLRenderer(width, height) {
+            glCanvas = document.createElement('canvas');
+            glCanvas.width = width;
+            glCanvas.height = height;
+            gl = glCanvas.getContext('webgl', { premultipliedAlpha: false, alpha: true });
+
+            if (!gl) {
+                console.warn('WebGL not available, PPT will not appear in recording');
+                return;
+            }
+
+            const vsSrc = `
+                attribute vec4 aPosition;
+                attribute vec3 aTexCoord;
+                varying vec3 vTexCoordW;
+                void main() {
+                    gl_Position = aPosition;
+                    vTexCoordW = aTexCoord;
+                }
+            `;
+
+            const fsSrc = `
+                precision mediump float;
+                varying vec3 vTexCoordW;
+                uniform sampler2D uTexture;
+                uniform float uOpacity;
+                void main() {
+                    vec2 tc = vTexCoordW.xy / vTexCoordW.z;
+                    vec4 color = texture2D(uTexture, tc);
+                    color.a *= uOpacity;
+                    gl_FragColor = color;
+                }
+            `;
+
+            const vs = compileShader(gl.VERTEX_SHADER, vsSrc);
+            const fs = compileShader(gl.FRAGMENT_SHADER, fsSrc);
+            glProgram = gl.createProgram();
+            gl.attachShader(glProgram, vs);
+            gl.attachShader(glProgram, fs);
+            gl.linkProgram(glProgram);
+
+            if (!gl.getProgramParameter(glProgram, gl.LINK_STATUS)) {
+                console.error('Shader link error:', gl.getProgramInfoLog(glProgram));
+                return;
+            }
+
+            gl.useProgram(glProgram);
+
+            glTexCoordBuffer = gl.createBuffer();
+            glPositionBuffer = gl.createBuffer();
+
+            glTexture = gl.createTexture();
+
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+            glReady = true;
+        }
+
+        function compileShader(type, src) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, src);
+            gl.compileShader(shader);
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+            }
+            return shader;
+        }
+
+        function updateGLTexture(image) {
+            if (!gl) return;
+            gl.bindTexture(gl.TEXTURE_2D, glTexture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        }
+
+        function renderPPTToGL(crn, opacity) {
+            if (!gl || !glReady) return;
+
+            // Compute homography for w values
+            const H = computeHomography(
+                { x: crn.tl.x * glCanvas.width, y: crn.tl.y * glCanvas.height },
+                { x: crn.tr.x * glCanvas.width, y: crn.tr.y * glCanvas.height },
+                { x: crn.br.x * glCanvas.width, y: crn.br.y * glCanvas.height },
+                { x: crn.bl.x * glCanvas.width, y: crn.bl.y * glCanvas.height }
+            );
+            if (!H) return;
+
+            // w values for perspective-correct interpolation
+            const wTL = 1;
+            const wTR = H.g + 1;
+            const wBR = H.g + H.h + 1;
+            const wBL = H.h + 1;
+
+            // Convert fractional corners to clip space (-1 to 1, Y flipped)
+            function toClip(fx, fy) {
+                return [fx * 2 - 1, 1 - fy * 2];
+            }
+
+            const tl = toClip(crn.tl.x, crn.tl.y);
+            const tr = toClip(crn.tr.x, crn.tr.y);
+            const bl = toClip(crn.bl.x, crn.bl.y);
+            const br = toClip(crn.br.x, crn.br.y);
+
+            // Position buffer (TRIANGLE_STRIP: TL, TR, BL, BR)
+            gl.bindBuffer(gl.ARRAY_BUFFER, glPositionBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                tl[0], tl[1], 0, 1,
+                tr[0], tr[1], 0, 1,
+                bl[0], bl[1], 0, 1,
+                br[0], br[1], 0, 1
+            ]), gl.DYNAMIC_DRAW);
+            const aPos = gl.getAttribLocation(glProgram, 'aPosition');
+            gl.enableVertexAttribArray(aPos);
+            gl.vertexAttribPointer(aPos, 4, gl.FLOAT, false, 0, 0);
+
+            // TexCoord buffer with w for perspective correction
+            // (u*w, v*w, w) for TRIANGLE_STRIP: TL(0,0), TR(1,0), BL(0,1), BR(1,1)
+            gl.bindBuffer(gl.ARRAY_BUFFER, glTexCoordBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+                0 * wTL, 0 * wTL, wTL,
+                1 * wTR, 0 * wTR, wTR,
+                0 * wBL, 1 * wBL, wBL,
+                1 * wBR, 1 * wBR, wBR
+            ]), gl.DYNAMIC_DRAW);
+            const aTex = gl.getAttribLocation(glProgram, 'aTexCoord');
+            gl.enableVertexAttribArray(aTex);
+            gl.vertexAttribPointer(aTex, 3, gl.FLOAT, false, 0, 0);
+
+            gl.bindTexture(gl.TEXTURE_2D, glTexture);
+            gl.uniform1f(gl.getUniformLocation(glProgram, 'uOpacity'), opacity);
+
+            gl.viewport(0, 0, glCanvas.width, glCanvas.height);
+            gl.clearColor(0, 0, 0, 0);
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
 
         // ==================== RECORDING ====================
@@ -703,9 +977,34 @@
 
             const ctx = canvas.getContext('2d');
 
+            // Init WebGL renderer for PPT compositing
+            initGLRenderer(canvas.width, canvas.height);
+            if (receivedPptReady && glReady) {
+                updateGLTexture(receivedPptImage);
+            }
+
             function drawFrame() {
                 if (!isRecording) return;
+
+                // 1. Draw video with flip
+                ctx.save();
+                if (flipState.h) {
+                    ctx.translate(canvas.width, 0);
+                    ctx.scale(-1, 1);
+                }
+                if (flipState.v) {
+                    ctx.translate(0, canvas.height);
+                    ctx.scale(1, -1);
+                }
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                ctx.restore();
+
+                // 2. Draw PPT overlay if visible
+                if (pptState.visible && receivedPptReady && glReady) {
+                    renderPPTToGL(corners, pptState.opacity);
+                    ctx.drawImage(glCanvas, 0, 0, canvas.width, canvas.height);
+                }
+
                 requestAnimationFrame(drawFrame);
             }
 
@@ -752,21 +1051,66 @@
             document.getElementById('recordingIndicator').classList.remove('active');
 
             updateStatus('connected', 'Kamera aktif');
-            showToast('Rekaman selesai!', 'success');
         }
 
         function saveRecording() {
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
+            lastRecordingBlob = new Blob(recordedChunks, { type: 'video/webm' });
+            lastRecordingFilename = `FLM_Cam_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
 
+            const url = URL.createObjectURL(lastRecordingBlob);
+            const previewVideo = document.getElementById('previewVideo');
+            previewVideo.src = url;
+
+            document.getElementById('recordingPreview').classList.remove('hidden');
+
+            // Show share button if supported
+            try {
+                const canShare = navigator.canShare && navigator.canShare({
+                    files: [new File([''], 'test.webm', { type: 'video/webm' })]
+                });
+                document.getElementById('shareBtn').classList.toggle('hidden', !canShare);
+            } catch (e) {
+                document.getElementById('shareBtn').classList.add('hidden');
+            }
+
+            showToast('Rekaman selesai! Preview tersedia.', 'success');
+        }
+
+        function downloadRecording() {
+            if (!lastRecordingBlob) return;
+            const url = URL.createObjectURL(lastRecordingBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `FLM_Cam_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+            a.download = lastRecordingFilename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-
+            URL.revokeObjectURL(url);
             showToast('Video berhasil diunduh!', 'success');
+        }
+
+        async function shareRecording() {
+            if (!lastRecordingBlob) return;
+            const file = new File([lastRecordingBlob], lastRecordingFilename, { type: 'video/webm' });
+            try {
+                await navigator.share({
+                    title: 'FLM Cam Recording',
+                    files: [file]
+                });
+                showToast('Berhasil di-share!', 'success');
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    showToast('Gagal share: ' + err.message, 'error');
+                }
+            }
+        }
+
+        function closePreview() {
+            document.getElementById('recordingPreview').classList.add('hidden');
+            const previewVideo = document.getElementById('previewVideo');
+            previewVideo.pause();
+            previewVideo.removeAttribute('src');
+            previewVideo.load();
         }
 
         // ==================== PPT CONTROLS ====================
@@ -833,8 +1177,6 @@
             return { w: container.offsetWidth, h: container.offsetHeight };
         }
 
-        // Compute homography matrix that maps unit square to arbitrary quad
-        // Maps (0,0)→tl, (1,0)→tr, (1,1)→br, (0,1)→bl
         function computeHomography(tl, tr, br, bl) {
             const dx1 = tr.x - br.x;
             const dx2 = bl.x - br.x;
@@ -856,8 +1198,6 @@
             const e = bl.y - tl.y + h * bl.y;
             const f = tl.y;
 
-            // H maps (u,v) in [0,1]x[0,1] → (x,y) in pixel space
-            // H = [[a, b, c], [d, e, f], [g, h, 1]]
             return { a, b, c, d, e, f, g, h };
         }
 
@@ -865,7 +1205,6 @@
             const { w, h } = getContainerSize();
             if (w === 0 || h === 0) return;
 
-            // Convert fractional corners to pixel positions
             const tl = { x: corners.tl.x * w, y: corners.tl.y * h };
             const tr = { x: corners.tr.x * w, y: corners.tr.y * h };
             const br = { x: corners.br.x * w, y: corners.br.y * h };
@@ -874,22 +1213,15 @@
             const H = computeHomography(tl, tr, br, bl);
             if (!H) return;
 
-            // The overlay element is W x H pixels (100% of container)
-            // We need to map the element's (0,0)-(W,0)-(W,H)-(0,H) to the corner positions
-            // Compose with scale: CSS_H = H * [[1/W,0,0],[0,1/H,0],[0,0,1]]
             const aW = H.a / w, bH = H.b / h;
             const dW = H.d / w, eH = H.e / h;
             const gW = H.g / w, hH = H.h / h;
 
-            // CSS matrix3d in column-major order
             const m = `matrix3d(${aW}, ${dW}, 0, ${gW}, ${bH}, ${eH}, 0, ${hH}, 0, 0, 1, 0, ${H.c}, ${H.f}, 0, 1)`;
 
             document.getElementById('pptOverlay').style.transform = m;
 
-            // Update corner handle positions
             updateCornerHandlePositions();
-
-            // Update guide lines
             updateGuideLines();
         }
 
