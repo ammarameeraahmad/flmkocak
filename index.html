@@ -885,40 +885,73 @@
 
         async function connectToPhone() {
             try {
-                peerConnection = new RTCPeerConnection(iceServers);
+                updateStatus('connecting', 'Menyambungkan...');
+                showToast('Menunggu HP terhubung...', 'success');
 
-                peerConnection.ontrack = (event) => {
-                    const remoteVideo = document.getElementById('remoteVideo');
-                    remoteVideo.srcObject = event.streams[0];
-                    remoteVideo.classList.remove('hidden');
-                    document.getElementById('videoElement').classList.add('hidden');
-                };
-
-                peerConnection.onicecandidate = (event) => {
-                    if (event.candidate) {
-                        db.ref(`sessions/${sessionId}/laptop_ice`).push(event.candidate.toJSON());
+                // Listen for phone offer - use 'on' to wait if phone hasn't connected yet
+                db.ref(`sessions/${sessionId}/phone_offer`).on('value', async (snapshot) => {
+                    const offer = snapshot.val();
+                    if (!offer) {
+                        updateStatus('connecting', 'Menunggu HP menyiarkan kamera...');
+                        return;
                     }
-                };
 
-                // Listen for phone offer
-                db.ref(`sessions/${sessionId}/phone_offer`).once('value', async (snapshot) => {
-                    if (snapshot.val()) {
-                        await peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
-                        
+                    // Stop listening once we have the offer
+                    db.ref(`sessions/${sessionId}/phone_offer`).off('value');
+
+                    try {
+                        // Create new peer connection
+                        if (peerConnection) {
+                            peerConnection.close();
+                        }
+                        peerConnection = new RTCPeerConnection(iceServers);
+
+                        peerConnection.ontrack = (event) => {
+                            const remoteVideo = document.getElementById('remoteVideo');
+                            remoteVideo.srcObject = event.streams[0];
+                            remoteVideo.classList.remove('hidden');
+                            document.getElementById('videoElement').classList.add('hidden');
+                            updateStatus('connected', 'Terhubung ke HP');
+                        };
+
+                        peerConnection.onicecandidate = (event) => {
+                            if (event.candidate) {
+                                db.ref(`sessions/${sessionId}/laptop_ice`).push(event.candidate.toJSON());
+                            }
+                        };
+
+                        peerConnection.onconnectionstatechange = () => {
+                            if (peerConnection.connectionState === 'disconnected' ||
+                                peerConnection.connectionState === 'failed') {
+                                updateStatus('disconnected', 'Koneksi terputus');
+                            }
+                        };
+
+                        // Set remote description (phone's offer)
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
+
+                        // Create and set answer
                         const answer = await peerConnection.createAnswer();
                         await peerConnection.setLocalDescription(answer);
-                        
-                        db.ref(`sessions/${sessionId}`).update({ laptop_answer: answer });
+                        db.ref(`sessions/${sessionId}`).update({
+                            laptop_answer: { type: answer.type, sdp: answer.sdp }
+                        });
+
+                        // NOW listen for phone ICE candidates (after remote desc is set)
+                        db.ref(`sessions/${sessionId}/phone_ice`).on('child_added', async (snapshot) => {
+                            try {
+                                await peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
+                            } catch (e) {
+                                console.warn('ICE candidate error:', e);
+                            }
+                        });
+
+                        updateStatus('connecting', 'Menghubungkan peer...');
+                    } catch (err) {
+                        console.error('WebRTC setup error:', err);
+                        updateStatus('disconnected', 'Gagal setup WebRTC');
                     }
                 });
-
-                // Listen for phone ICE
-                db.ref(`sessions/${sessionId}/phone_ice`).on('child_added', async (snapshot) => {
-                    await peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
-                });
-
-                updateStatus('connecting', 'Menyambungkan...');
-                showToast('Mencoba menyambungkan...', 'success');
             } catch (error) {
                 console.error('Connection error:', error);
                 updateStatus('disconnected', 'Gagal menyambungkan');
