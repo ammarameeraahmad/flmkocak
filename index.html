@@ -28,7 +28,6 @@
             padding: 20px;
         }
 
-        /* Header */
         .header {
             text-align: center;
             padding: 20px;
@@ -37,16 +36,9 @@
             margin-bottom: 20px;
         }
 
-        .header h1 {
-            font-size: 1.8rem;
-            margin-bottom: 10px;
-        }
+        .header h1 { font-size: 1.8rem; margin-bottom: 10px; }
+        .header p { opacity: 0.9; }
 
-        .header p {
-            opacity: 0.9;
-        }
-
-        /* Mode Selection */
         .mode-selection {
             display: flex;
             gap: 20px;
@@ -64,26 +56,11 @@
             font-weight: bold;
         }
 
-        .mode-btn.phone {
-            background: #4CAF50;
-            color: white;
-        }
+        .mode-btn.phone { background: #4CAF50; color: white; }
+        .mode-btn.laptop { background: #2196F3; color: white; }
+        .mode-btn:hover { transform: translateY(-3px); box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .mode-btn.active { box-shadow: 0 0 0 4px rgba(255,255,255,0.3); }
 
-        .mode-btn.laptop {
-            background: #2196F3;
-            color: white;
-        }
-
-        .mode-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
-        }
-
-        .mode-btn.active {
-            box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
-        }
-
-        /* Peer ID Display */
         .session-info {
             background: #2d2d44;
             padding: 15px;
@@ -105,7 +82,6 @@
             cursor: pointer;
         }
 
-        /* Main Content */
         .main-content {
             display: grid;
             grid-template-columns: 1fr 350px;
@@ -113,12 +89,9 @@
         }
 
         @media (max-width: 900px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
+            .main-content { grid-template-columns: 1fr; }
         }
 
-        /* Video Container */
         .video-section {
             background: #2d2d44;
             border-radius: 15px;
@@ -140,7 +113,7 @@
             object-fit: cover;
         }
 
-        /* PPT Overlay */
+        /* PPT Overlay - perspective transformed */
         #pptOverlay {
             position: absolute;
             top: 0;
@@ -149,41 +122,80 @@
             height: 100%;
             pointer-events: none;
             display: none;
-        }
-
-        #pptOverlay.draggable {
-            pointer-events: auto;
-            cursor: move;
+            transform-origin: 0 0;
         }
 
         #pptImage {
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
             position: absolute;
-            transform-origin: top left;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            object-fit: fill;
         }
 
-        /* Resize Handle */
-        .resize-handle {
+        /* Corner handles - outside overlay so they don't get transformed */
+        .corner-handle {
             position: absolute;
-            bottom: -10px;
-            right: -10px;
-            width: 30px;
-            height: 30px;
+            width: 28px;
+            height: 28px;
             background: #667eea;
+            border: 3px solid #fff;
             border-radius: 50%;
-            cursor: se-resize;
+            cursor: grab;
+            z-index: 20;
+            transform: translate(-50%, -50%);
             display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
+            touch-action: none;
         }
 
-        #pptOverlay.draggable .resize-handle {
-            display: flex;
+        .corner-handle:active { cursor: grabbing; background: #ff9800; }
+        .corner-handle.visible { display: block; }
+
+        .corner-handle::after {
+            content: attr(data-label);
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 10px;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            padding: 1px 4px;
+            border-radius: 3px;
+            white-space: nowrap;
         }
 
-        /* Controls Panel */
+        /* Guide lines between corners */
+        .corner-lines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 15;
+        }
+
+        .recording-indicator {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            animation: blink 1s infinite;
+            z-index: 25;
+        }
+
+        .recording-indicator.active { display: flex; align-items: center; gap: 8px; }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
         .controls-panel {
             background: #2d2d44;
             border-radius: 15px;
@@ -198,9 +210,7 @@
             padding-bottom: 10px;
         }
 
-        .control-group {
-            margin-bottom: 20px;
-        }
+        .control-group { margin-bottom: 20px; }
 
         .control-label {
             display: block;
@@ -209,7 +219,6 @@
             color: #aaa;
         }
 
-        /* Buttons */
         .btn {
             width: 100%;
             padding: 12px;
@@ -222,38 +231,13 @@
             margin-bottom: 10px;
         }
 
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #4CAF50; color: white; }
+        .btn-danger { background: #f44336; color: white; }
+        .btn-warning { background: #ff9800; color: white; }
+        .btn:hover { opacity: 0.9; transform: translateY(-2px); }
+        .btn:disabled { background: #555; cursor: not-allowed; transform: none; }
 
-        .btn-success {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .btn-danger {
-            background: #f44336;
-            color: white;
-        }
-
-        .btn-warning {
-            background: #ff9800;
-            color: white;
-        }
-
-        .btn:hover {
-            opacity: 0.9;
-            transform: translateY(-2px);
-        }
-
-        .btn:disabled {
-            background: #555;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        /* File Input */
         .file-input-wrapper {
             position: relative;
             overflow: hidden;
@@ -263,15 +247,12 @@
 
         .file-input-wrapper input[type=file] {
             position: absolute;
-            left: 0;
-            top: 0;
+            left: 0; top: 0;
             opacity: 0;
-            width: 100%;
-            height: 100%;
+            width: 100%; height: 100%;
             cursor: pointer;
         }
 
-        /* Range Slider */
         input[type="range"] {
             width: 100%;
             height: 8px;
@@ -283,21 +264,12 @@
 
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
-            width: 20px;
-            height: 20px;
+            width: 20px; height: 20px;
             border-radius: 50%;
             background: #667eea;
             cursor: pointer;
         }
 
-        .range-value {
-            text-align: center;
-            font-size: 0.9rem;
-            color: #aaa;
-            margin-top: 5px;
-        }
-
-        /* Status Indicators */
         .status {
             display: flex;
             align-items: center;
@@ -307,62 +279,20 @@
             margin-bottom: 10px;
         }
 
-        .status.connecting {
-            background: #ff9800;
-        }
-
-        .status.connected {
-            background: #4CAF50;
-        }
-
-        .status.disconnected {
-            background: #f44336;
-        }
+        .status.connecting { background: #ff9800; }
+        .status.connected { background: #4CAF50; }
+        .status.disconnected { background: #f44336; }
 
         .status-dot {
-            width: 10px;
-            height: 10px;
+            width: 10px; height: 10px;
             border-radius: 50%;
             background: #fff;
             animation: pulse 1.5s infinite;
         }
 
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
-        /* Recording Indicator */
-        .recording-indicator {
-            display: none;
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: #f44336;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            animation: blink 1s infinite;
-        }
-
-        .recording-indicator.active {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        @keyframes blink {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        /* Slide Navigation */
-        .slide-nav {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
+        .slide-nav { display: flex; gap: 10px; margin-top: 10px; }
 
         .slide-nav button {
             flex: 1;
@@ -374,26 +304,15 @@
             cursor: pointer;
         }
 
-        .slide-nav button:hover {
-            background: #333;
-        }
+        .slide-nav button:hover { background: #333; }
 
-        .slide-counter {
-            text-align: center;
-            color: #aaa;
-            margin: 10px 0;
-        }
+        .slide-counter { text-align: center; color: #aaa; margin: 10px 0; }
 
-        /* Hidden Sections */
-        .hidden {
-            display: none !important;
-        }
+        .hidden { display: none !important; }
 
-        /* Toast Notification */
         .toast {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 20px; right: 20px;
             background: #4CAF50;
             color: white;
             padding: 15px 25px;
@@ -402,10 +321,7 @@
             animation: slideIn 0.3s ease;
         }
 
-        @keyframes slideIn {
-            from { transform: translateX(100%); }
-            to { transform: translateX(0); }
-        }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 
         .connect-input {
             width: 200px;
@@ -419,23 +335,30 @@
             letter-spacing: 1px;
             text-transform: uppercase;
         }
+
+        .perspective-hint {
+            background: #1a1a2e;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: #aaa;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
         <div class="header">
             <h1>FLM Cam</h1>
-            <p>PPT Overlay Recording System - Record video dengan overlay PPT yang bisa di-resize</p>
+            <p>PPT Overlay Recording System - Proyeksikan slide PPT ke papan tulis</p>
         </div>
 
-        <!-- Mode Selection -->
         <div class="mode-selection" id="modeSelection">
             <button class="mode-btn phone" onclick="selectMode('phone')">Mode HP (Kamera)</button>
             <button class="mode-btn laptop" onclick="selectMode('laptop')">Mode Laptop (Monitor)</button>
         </div>
 
-        <!-- Peer ID Display -->
         <div class="session-info hidden" id="sessionInfo">
             <p>Peer ID Anda (klik untuk copy):</p>
             <div class="session-id" id="peerIdDisplay" onclick="copyPeerId()">Menghubungkan...</div>
@@ -448,51 +371,48 @@
             </div>
         </div>
 
-        <!-- Main Content -->
         <div class="main-content hidden" id="mainContent">
-            <!-- Video Section -->
             <div class="video-section">
-                <div class="video-container">
+                <div class="video-container" id="videoContainer">
                     <video id="videoElement" autoplay playsinline muted></video>
                     <video id="remoteVideo" autoplay playsinline muted class="hidden"></video>
 
                     <!-- PPT Overlay -->
                     <div id="pptOverlay">
                         <img id="pptImage" src="" alt="PPT Slide">
-                        <div class="resize-handle">&#8600;</div>
                     </div>
 
-                    <!-- Recording Indicator -->
+                    <!-- Corner handles (siblings of overlay, not children) -->
+                    <div class="corner-handle" id="cornerTL" data-label="TL"></div>
+                    <div class="corner-handle" id="cornerTR" data-label="TR"></div>
+                    <div class="corner-handle" id="cornerBR" data-label="BR"></div>
+                    <div class="corner-handle" id="cornerBL" data-label="BL"></div>
+
+                    <!-- Guide lines -->
+                    <svg class="corner-lines" id="cornerLines">
+                        <polygon id="guideQuad" fill="none" stroke="#667eea" stroke-width="2" stroke-dasharray="6,4" opacity="0.6"/>
+                    </svg>
+
                     <div class="recording-indicator" id="recordingIndicator">
                         <span>&#9679;</span> REC
                     </div>
                 </div>
 
-                <!-- Phone Controls -->
                 <div id="phoneControls" class="hidden">
-                    <button class="btn btn-success" id="startCameraBtn" onclick="startCamera()">
-                        Mulai Kamera
-                    </button>
-                    <button class="btn btn-danger" id="recordBtn" onclick="toggleRecording()" disabled>
-                        Mulai Rekam
-                    </button>
+                    <button class="btn btn-success" id="startCameraBtn" onclick="startCamera()">Mulai Kamera</button>
+                    <button class="btn btn-danger" id="recordBtn" onclick="toggleRecording()" disabled>Mulai Rekam</button>
                 </div>
 
-                <!-- Laptop Controls -->
-                <div id="laptopControls" class="hidden">
-                </div>
+                <div id="laptopControls" class="hidden"></div>
             </div>
 
-            <!-- Controls Panel -->
             <div class="controls-panel">
-                <!-- Status -->
                 <div class="panel-title">Status</div>
                 <div class="status disconnected" id="statusIndicator">
                     <div class="status-dot"></div>
                     <span id="statusText">Tidak terhubung</span>
                 </div>
 
-                <!-- PPT Controls (Laptop only) -->
                 <div id="pptControls" class="hidden">
                     <div class="panel-title">Kontrol PPT</div>
 
@@ -503,7 +423,7 @@
                             <input type="file" id="pptFileInput" accept="image/*" multiple onchange="handlePPTUpload(event)">
                         </div>
                         <p style="color: #666; font-size: 0.8rem; margin-top: 5px;">
-                            Upload gambar slide (PNG/JPG) satu per satu atau banyak sekaligus
+                            Upload gambar slide (PNG/JPG)
                         </p>
                     </div>
 
@@ -517,31 +437,19 @@
                     </div>
 
                     <div class="control-group">
-                        <label class="control-label">Ukuran PPT: <span id="scaleValue">100%</span></label>
-                        <input type="range" id="pptScale" min="10" max="200" value="100" oninput="updatePPTScale(this.value)">
+                        <label class="control-label">Opasitas: <span id="opacityValue">70%</span></label>
+                        <input type="range" id="pptOpacity" min="10" max="100" value="70" oninput="updatePPTOpacity(this.value)">
                     </div>
 
-                    <div class="control-group">
-                        <label class="control-label">Opasitas (Transparansi): <span id="opacityValue">80%</span></label>
-                        <input type="range" id="pptOpacity" min="10" max="100" value="80" oninput="updatePPTOpacity(this.value)">
+                    <div class="perspective-hint">
+                        Drag 4 titik sudut pada video untuk menyesuaikan PPT dengan bentuk papan tulis.
                     </div>
 
-                    <div class="control-group">
-                        <label class="control-label">Posisi X: <span id="posXValue">0</span></label>
-                        <input type="range" id="pptPosX" min="-500" max="500" value="0" oninput="updatePPTPosition()">
-                    </div>
-
-                    <div class="control-group">
-                        <label class="control-label">Posisi Y: <span id="posYValue">0</span></label>
-                        <input type="range" id="pptPosY" min="-300" max="300" value="0" oninput="updatePPTPosition()">
-                    </div>
-
-                    <button class="btn btn-primary" onclick="resetPPTPosition()">
-                        Reset Posisi
+                    <button class="btn btn-primary" onclick="resetCorners()">
+                        Reset Perspektif
                     </button>
                 </div>
 
-                <!-- Recording Info (Phone only) -->
                 <div id="recordingControls" class="hidden">
                     <div class="panel-title">Info Rekaman</div>
                     <p style="color: #aaa; font-size: 0.9rem;">
@@ -552,7 +460,6 @@
         </div>
     </div>
 
-    <!-- Toast -->
     <div class="toast hidden" id="toast"></div>
 
     <script>
@@ -570,17 +477,20 @@
         let currentSlideIndex = 0;
         let pptState = {
             visible: false,
-            scale: 1,
-            opacity: 0.8,
-            x: 0,
-            y: 0
+            opacity: 0.7
+        };
+
+        // Perspective corners (as fraction of container, 0-1)
+        let corners = {
+            tl: { x: 0.1, y: 0.1 },
+            tr: { x: 0.9, y: 0.1 },
+            br: { x: 0.9, y: 0.9 },
+            bl: { x: 0.1, y: 0.9 }
         };
 
         // ==================== PEERJS INIT ====================
         function initPeer() {
-            // Generate short random ID
             const shortId = 'flm-' + Math.random().toString(36).substring(2, 8);
-
             peer = new Peer(shortId);
 
             peer.on('open', (id) => {
@@ -591,21 +501,18 @@
             peer.on('error', (err) => {
                 console.error('PeerJS error:', err);
                 if (err.type === 'unavailable-id') {
-                    // ID taken, retry with different ID
                     initPeer();
                     return;
                 }
                 showToast('Koneksi error: ' + err.message, 'error');
             });
 
-            // Phone mode: listen for incoming calls
             peer.on('call', (call) => {
                 if (currentMode === 'phone' && mediaStream) {
                     call.answer(mediaStream);
                     activeCall = call;
 
                     call.on('stream', () => {
-                        // Laptop stream received (empty), connection confirmed
                         updateStatus('connected', 'Laptop terhubung!');
                         showToast('Laptop berhasil terhubung!', 'success');
                     });
@@ -614,12 +521,10 @@
                         updateStatus('disconnected', 'Laptop terputus');
                     });
                 } else {
-                    // Camera not ready yet, reject
                     showToast('Nyalakan kamera dulu sebelum laptop menyambung!', 'error');
                 }
             });
 
-            // Listen for data connections (for PPT sync)
             peer.on('connection', (conn) => {
                 setupDataConnection(conn);
             });
@@ -638,21 +543,17 @@
         function selectMode(mode) {
             currentMode = mode;
 
-            // Update buttons
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelector(`.mode-btn.${mode}`).classList.add('active');
 
-            // Show/hide controls
             document.getElementById('phoneControls').classList.toggle('hidden', mode !== 'phone');
             document.getElementById('laptopControls').classList.toggle('hidden', mode !== 'laptop');
             document.getElementById('pptControls').classList.toggle('hidden', mode !== 'laptop');
             document.getElementById('recordingControls').classList.toggle('hidden', mode !== 'phone');
 
-            // Show session info and main content
             document.getElementById('sessionInfo').classList.remove('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
 
-            // Mode-specific UI
             if (mode === 'phone') {
                 document.getElementById('sessionHint').textContent =
                     'Bagikan Peer ID ini ke laptop untuk terhubung';
@@ -663,10 +564,6 @@
                 document.getElementById('connectSection').classList.remove('hidden');
             }
 
-            // Make overlay draggable in laptop mode
-            document.getElementById('pptOverlay').classList.toggle('draggable', mode === 'laptop');
-
-            // Initialize peer if not yet
             if (!peer) {
                 initPeer();
             }
@@ -706,18 +603,16 @@
 
             updateStatus('connecting', 'Menyambungkan ke HP...');
 
-            // Video call
             const call = peer.call(remotePeerId, createEmptyStream());
             activeCall = call;
 
             call.on('stream', (remoteStream) => {
                 const remoteVideo = document.getElementById('remoteVideo');
                 remoteVideo.srcObject = remoteStream;
-                remoteVideo.muted = false; // unmute after setting stream
+                remoteVideo.muted = false;
                 remoteVideo.classList.remove('hidden');
                 document.getElementById('videoElement').classList.add('hidden');
 
-                // Force play in case autoplay is blocked
                 remoteVideo.play().catch(e => {
                     console.warn('Autoplay blocked, trying muted:', e);
                     remoteVideo.muted = true;
@@ -738,12 +633,10 @@
                 showToast('Gagal menyambung: ' + err.message, 'error');
             });
 
-            // Data connection for PPT sync
             dataConn = peer.connect(remotePeerId);
             setupDataConnection(dataConn);
         }
 
-        // Create empty media stream (needed to initiate call from laptop)
         function createEmptyStream() {
             const canvas = document.createElement('canvas');
             canvas.width = 1;
@@ -760,32 +653,21 @@
 
             conn.on('data', (data) => {
                 if (data.type === 'ppt-state') {
-                    // Update local PPT state from remote
-                    pptState.scale = data.scale || 1;
-                    pptState.opacity = data.opacity || 0.8;
-                    pptState.x = data.x || 0;
-                    pptState.y = data.y || 0;
+                    pptState.opacity = data.opacity || 0.7;
+
+                    if (data.corners) {
+                        corners = data.corners;
+                    }
 
                     if (data.visible) {
                         document.getElementById('pptOverlay').style.display = 'block';
                     }
 
-                    // Apply styles
-                    const pptImg = document.getElementById('pptImage');
-                    pptImg.style.width = (pptState.scale * 100) + '%';
-                    pptImg.style.opacity = pptState.opacity;
-                    document.getElementById('pptOverlay').style.transform =
-                        `translate(${pptState.x}px, ${pptState.y}px)`;
-
-                    // Update UI sliders
-                    document.getElementById('pptScale').value = pptState.scale * 100;
-                    document.getElementById('scaleValue').textContent = Math.round(pptState.scale * 100) + '%';
+                    document.getElementById('pptImage').style.opacity = pptState.opacity;
                     document.getElementById('pptOpacity').value = pptState.opacity * 100;
                     document.getElementById('opacityValue').textContent = Math.round(pptState.opacity * 100) + '%';
-                    document.getElementById('pptPosX').value = pptState.x;
-                    document.getElementById('posXValue').textContent = pptState.x;
-                    document.getElementById('pptPosY').value = pptState.y;
-                    document.getElementById('posYValue').textContent = pptState.y;
+
+                    applyPerspective();
                 }
             });
         }
@@ -796,21 +678,15 @@
             dataConn.send({
                 type: 'ppt-state',
                 currentSlide: currentSlideIndex,
-                scale: pptState.scale,
                 opacity: pptState.opacity,
-                x: pptState.x,
-                y: pptState.y,
+                corners: corners,
                 visible: pptState.visible
             });
         }
 
         // ==================== RECORDING ====================
         function toggleRecording() {
-            if (!isRecording) {
-                startRecording();
-            } else {
-                stopRecording();
-            }
+            if (!isRecording) { startRecording(); } else { stopRecording(); }
         }
 
         function startRecording() {
@@ -819,7 +695,6 @@
                 return;
             }
 
-            // Create canvas stream with overlay
             const canvas = document.createElement('canvas');
             const video = document.getElementById('videoElement');
 
@@ -830,23 +705,7 @@
 
             function drawFrame() {
                 if (!isRecording) return;
-
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                // Draw overlay if visible
-                if (pptState.visible) {
-                    ctx.globalAlpha = pptState.opacity;
-                    const scale = pptState.scale;
-                    const x = pptState.x + (canvas.width - canvas.width * scale) / 2;
-                    const y = pptState.y + 20;
-
-                    const pptImg = document.getElementById('pptImage');
-                    if (pptImg.src && pptImg.complete) {
-                        ctx.drawImage(pptImg, x, y, canvas.width * scale, canvas.height * scale);
-                    }
-                    ctx.globalAlpha = 1;
-                }
-
                 requestAnimationFrame(drawFrame);
             }
 
@@ -863,9 +722,7 @@
             recordedChunks = [];
 
             mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) {
-                    recordedChunks.push(e.data);
-                }
+                if (e.data.size > 0) recordedChunks.push(e.data);
             };
 
             mediaRecorder.onstop = saveRecording;
@@ -929,7 +786,6 @@
                         showSlide(0);
                     }
 
-                    syncPPTState();
                     showToast(`Slide ${pptSlides.length} diupload!`, 'success');
                 };
 
@@ -944,32 +800,23 @@
                 document.getElementById('pptOverlay').style.display = 'block';
                 pptState.visible = true;
                 updateSlideCounter();
+                showCornerHandles(true);
+                applyPerspective();
                 syncPPTState();
             }
         }
 
         function prevSlide() {
-            if (currentSlideIndex > 0) {
-                showSlide(currentSlideIndex - 1);
-            }
+            if (currentSlideIndex > 0) showSlide(currentSlideIndex - 1);
         }
 
         function nextSlide() {
-            if (currentSlideIndex < pptSlides.length - 1) {
-                showSlide(currentSlideIndex + 1);
-            }
+            if (currentSlideIndex < pptSlides.length - 1) showSlide(currentSlideIndex + 1);
         }
 
         function updateSlideCounter() {
             document.getElementById('slideCounter').textContent =
                 `${currentSlideIndex + 1} / ${pptSlides.length}`;
-        }
-
-        function updatePPTScale(value) {
-            pptState.scale = value / 100;
-            document.getElementById('scaleValue').textContent = value + '%';
-            document.getElementById('pptImage').style.width = (pptState.scale * 100) + '%';
-            syncPPTState();
         }
 
         function updatePPTOpacity(value) {
@@ -979,76 +826,181 @@
             syncPPTState();
         }
 
-        function updatePPTPosition() {
-            pptState.x = parseInt(document.getElementById('pptPosX').value);
-            pptState.y = parseInt(document.getElementById('pptPosY').value);
+        // ==================== PERSPECTIVE TRANSFORM ====================
 
-            document.getElementById('posXValue').textContent = pptState.x;
-            document.getElementById('posYValue').textContent = pptState.y;
+        function getContainerSize() {
+            const container = document.getElementById('videoContainer');
+            return { w: container.offsetWidth, h: container.offsetHeight };
+        }
 
-            document.getElementById('pptOverlay').style.transform =
-                `translate(${pptState.x}px, ${pptState.y}px)`;
+        // Compute homography matrix that maps unit square to arbitrary quad
+        // Maps (0,0)→tl, (1,0)→tr, (1,1)→br, (0,1)→bl
+        function computeHomography(tl, tr, br, bl) {
+            const dx1 = tr.x - br.x;
+            const dx2 = bl.x - br.x;
+            const sx  = tl.x - tr.x + br.x - bl.x;
+            const dy1 = tr.y - br.y;
+            const dy2 = bl.y - br.y;
+            const sy  = tl.y - tr.y + br.y - bl.y;
 
+            const det = dx1 * dy2 - dx2 * dy1;
+            if (Math.abs(det) < 1e-10) return null;
+
+            const g = (sx * dy2 - dx2 * sy) / det;
+            const h = (dx1 * sy - sx * dy1) / det;
+
+            const a = tr.x - tl.x + g * tr.x;
+            const b = bl.x - tl.x + h * bl.x;
+            const c = tl.x;
+            const d = tr.y - tl.y + g * tr.y;
+            const e = bl.y - tl.y + h * bl.y;
+            const f = tl.y;
+
+            // H maps (u,v) in [0,1]x[0,1] → (x,y) in pixel space
+            // H = [[a, b, c], [d, e, f], [g, h, 1]]
+            return { a, b, c, d, e, f, g, h };
+        }
+
+        function applyPerspective() {
+            const { w, h } = getContainerSize();
+            if (w === 0 || h === 0) return;
+
+            // Convert fractional corners to pixel positions
+            const tl = { x: corners.tl.x * w, y: corners.tl.y * h };
+            const tr = { x: corners.tr.x * w, y: corners.tr.y * h };
+            const br = { x: corners.br.x * w, y: corners.br.y * h };
+            const bl = { x: corners.bl.x * w, y: corners.bl.y * h };
+
+            const H = computeHomography(tl, tr, br, bl);
+            if (!H) return;
+
+            // The overlay element is W x H pixels (100% of container)
+            // We need to map the element's (0,0)-(W,0)-(W,H)-(0,H) to the corner positions
+            // Compose with scale: CSS_H = H * [[1/W,0,0],[0,1/H,0],[0,0,1]]
+            const aW = H.a / w, bH = H.b / h;
+            const dW = H.d / w, eH = H.e / h;
+            const gW = H.g / w, hH = H.h / h;
+
+            // CSS matrix3d in column-major order
+            const m = `matrix3d(${aW}, ${dW}, 0, ${gW}, ${bH}, ${eH}, 0, ${hH}, 0, 0, 1, 0, ${H.c}, ${H.f}, 0, 1)`;
+
+            document.getElementById('pptOverlay').style.transform = m;
+
+            // Update corner handle positions
+            updateCornerHandlePositions();
+
+            // Update guide lines
+            updateGuideLines();
+        }
+
+        function showCornerHandles(show) {
+            const handles = document.querySelectorAll('.corner-handle');
+            handles.forEach(h => h.classList.toggle('visible', show && currentMode === 'laptop'));
+            if (show && currentMode === 'laptop') {
+                updateCornerHandlePositions();
+                updateGuideLines();
+            }
+        }
+
+        function updateCornerHandlePositions() {
+            const { w, h } = getContainerSize();
+
+            document.getElementById('cornerTL').style.left = (corners.tl.x * w) + 'px';
+            document.getElementById('cornerTL').style.top  = (corners.tl.y * h) + 'px';
+
+            document.getElementById('cornerTR').style.left = (corners.tr.x * w) + 'px';
+            document.getElementById('cornerTR').style.top  = (corners.tr.y * h) + 'px';
+
+            document.getElementById('cornerBR').style.left = (corners.br.x * w) + 'px';
+            document.getElementById('cornerBR').style.top  = (corners.br.y * h) + 'px';
+
+            document.getElementById('cornerBL').style.left = (corners.bl.x * w) + 'px';
+            document.getElementById('cornerBL').style.top  = (corners.bl.y * h) + 'px';
+        }
+
+        function updateGuideLines() {
+            const { w, h } = getContainerSize();
+            const points = [
+                `${corners.tl.x * w},${corners.tl.y * h}`,
+                `${corners.tr.x * w},${corners.tr.y * h}`,
+                `${corners.br.x * w},${corners.br.y * h}`,
+                `${corners.bl.x * w},${corners.bl.y * h}`
+            ].join(' ');
+
+            document.getElementById('guideQuad').setAttribute('points', points);
+        }
+
+        function resetCorners() {
+            corners = {
+                tl: { x: 0.1, y: 0.1 },
+                tr: { x: 0.9, y: 0.1 },
+                br: { x: 0.9, y: 0.9 },
+                bl: { x: 0.1, y: 0.9 }
+            };
+            applyPerspective();
             syncPPTState();
+            showToast('Perspektif direset!', 'success');
         }
 
-        function resetPPTPosition() {
-            pptState.scale = 1;
-            pptState.opacity = 0.8;
-            pptState.x = 0;
-            pptState.y = 0;
+        // ==================== CORNER DRAGGING (MOUSE + TOUCH) ====================
+        let draggingCorner = null;
 
-            document.getElementById('pptScale').value = 100;
-            document.getElementById('pptOpacity').value = 80;
-            document.getElementById('pptPosX').value = 0;
-            document.getElementById('pptPosY').value = 0;
-
-            updatePPTScale(100);
-            updatePPTOpacity(80);
-            updatePPTPosition();
-
-            showToast('Posisi PPT direset!', 'success');
+        function getPointerPos(e, container) {
+            const rect = container.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+                y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height))
+            };
         }
 
-        // ==================== DRAG FUNCTIONALITY ====================
-        let isDragging = false;
-        let dragStart = { x: 0, y: 0 };
-
-        const pptOverlay = document.getElementById('pptOverlay');
-
-        pptOverlay.addEventListener('mousedown', (e) => {
+        function onCornerPointerDown(e) {
             if (currentMode !== 'laptop') return;
-            isDragging = true;
-            dragStart = { x: e.clientX - pptState.x, y: e.clientY - pptState.y };
-        });
+            e.preventDefault();
+            const cornerKey = e.target.dataset.label.toLowerCase();
+            draggingCorner = cornerKey;
+            e.target.style.background = '#ff9800';
+        }
 
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging || currentMode !== 'laptop') return;
+        function onPointerMove(e) {
+            if (!draggingCorner) return;
+            e.preventDefault();
+            const container = document.getElementById('videoContainer');
+            const pos = getPointerPos(e, container);
+            corners[draggingCorner] = pos;
+            applyPerspective();
+        }
 
-            pptState.x = e.clientX - dragStart.x;
-            pptState.y = e.clientY - dragStart.y;
-
-            document.getElementById('pptPosX').value = pptState.x;
-            document.getElementById('posXValue').textContent = pptState.x;
-            document.getElementById('pptPosY').value = pptState.y;
-            document.getElementById('posYValue').textContent = pptState.y;
-
-            document.getElementById('pptOverlay').style.transform =
-                `translate(${pptState.x}px, ${pptState.y}px)`;
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
+        function onPointerUp() {
+            if (draggingCorner) {
+                const handle = document.querySelector(`[data-label="${draggingCorner.toUpperCase()}"]`);
+                if (handle) handle.style.background = '#667eea';
+                draggingCorner = null;
                 syncPPTState();
             }
+        }
+
+        // Attach events to corner handles
+        document.querySelectorAll('.corner-handle').forEach(handle => {
+            handle.addEventListener('mousedown', onCornerPointerDown);
+            handle.addEventListener('touchstart', onCornerPointerDown, { passive: false });
+        });
+
+        document.addEventListener('mousemove', onPointerMove);
+        document.addEventListener('touchmove', onPointerMove, { passive: false });
+        document.addEventListener('mouseup', onPointerUp);
+        document.addEventListener('touchend', onPointerUp);
+
+        // Recompute on resize
+        window.addEventListener('resize', () => {
+            if (pptState.visible) applyPerspective();
         });
 
         // ==================== UTILITIES ====================
         function updateStatus(status, text) {
             const indicator = document.getElementById('statusIndicator');
             const statusText = document.getElementById('statusText');
-
             indicator.className = 'status ' + status;
             statusText.textContent = text;
         }
@@ -1058,10 +1010,7 @@
             toast.textContent = message;
             toast.style.background = type === 'error' ? '#f44336' : '#4CAF50';
             toast.classList.remove('hidden');
-
-            setTimeout(() => {
-                toast.classList.add('hidden');
-            }, 3000);
+            setTimeout(() => { toast.classList.add('hidden'); }, 3000);
         }
     </script>
 </body>
