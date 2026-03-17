@@ -454,7 +454,7 @@
             <div class="video-section">
                 <div class="video-container">
                     <video id="videoElement" autoplay playsinline muted></video>
-                    <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+                    <video id="remoteVideo" autoplay playsinline muted class="hidden"></video>
 
                     <!-- PPT Overlay -->
                     <div id="pptOverlay">
@@ -603,12 +603,19 @@
                 if (currentMode === 'phone' && mediaStream) {
                     call.answer(mediaStream);
                     activeCall = call;
-                    updateStatus('connected', 'Laptop terhubung!');
-                    showToast('Laptop berhasil terhubung!', 'success');
+
+                    call.on('stream', () => {
+                        // Laptop stream received (empty), connection confirmed
+                        updateStatus('connected', 'Laptop terhubung!');
+                        showToast('Laptop berhasil terhubung!', 'success');
+                    });
 
                     call.on('close', () => {
                         updateStatus('disconnected', 'Laptop terputus');
                     });
+                } else {
+                    // Camera not ready yet, reject
+                    showToast('Nyalakan kamera dulu sebelum laptop menyambung!', 'error');
                 }
             });
 
@@ -706,8 +713,17 @@
             call.on('stream', (remoteStream) => {
                 const remoteVideo = document.getElementById('remoteVideo');
                 remoteVideo.srcObject = remoteStream;
+                remoteVideo.muted = false; // unmute after setting stream
                 remoteVideo.classList.remove('hidden');
                 document.getElementById('videoElement').classList.add('hidden');
+
+                // Force play in case autoplay is blocked
+                remoteVideo.play().catch(e => {
+                    console.warn('Autoplay blocked, trying muted:', e);
+                    remoteVideo.muted = true;
+                    remoteVideo.play();
+                });
+
                 updateStatus('connected', 'Terhubung ke HP');
                 showToast('Berhasil terhubung!', 'success');
             });
