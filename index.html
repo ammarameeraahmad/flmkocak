@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FLM Cam - PPT Overlay Recording</title>
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+        }
+
+        /* Mode Selection */
+        .mode-selection {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .mode-btn {
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+
+        .mode-btn.phone {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .mode-btn.laptop {
+            background: #2196F3;
+            color: white;
+        }
+
+        .mode-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .mode-btn.active {
+            box-shadow: 0 0 0 4px rgba(255,255,255,0.3);
+        }
+
+        /* Session ID Display */
+        .session-info {
+            background: #2d2d44;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .session-id {
+            font-family: monospace;
+            font-size: 1.3rem;
+            color: #00ff88;
+            background: #1a1a2e;
+            padding: 10px 20px;
+            border-radius: 5px;
+            display: inline-block;
+            letter-spacing: 2px;
+        }
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+        }
+
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Video Container */
+        .video-section {
+            background: #2d2d44;
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            aspect-ratio: 16/9;
+        }
+
+        #videoElement, #remoteVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* PPT Overlay */
+        #pptOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: none;
+        }
+
+        #pptOverlay.draggable {
+            pointer-events: auto;
+            cursor: move;
+        }
+
+        #pptImage {
+            max-width: 100%;
+            max-height: 100%;
+            position: absolute;
+            transform-origin: top left;
+        }
+
+        /* Resize Handle */
+        .resize-handle {
+            position: absolute;
+            bottom: -10px;
+            right: -10px;
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            border-radius: 50%;
+            cursor: se-resize;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        #pptOverlay.draggable .resize-handle {
+            display: flex;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            background: #2d2d44;
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .panel-title {
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+            color: #667eea;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #aaa;
+        }
+
+        /* Buttons */
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-success {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ff9800;
+            color: white;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* File Input */
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        /* Range Slider */
+        input[type="range"] {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: #1a1a2e;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+        }
+
+        .range-value {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-top: 5px;
+        }
+
+        /* Status Indicators */
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .status.connecting {
+            background: #ff9800;
+        }
+
+        .status.connected {
+            background: #4CAF50;
+        }
+
+        .status.disconnected {
+            background: #f44336;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #fff;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Recording Indicator */
+        .recording-indicator {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: #f44336;
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            animation: blink 1s infinite;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Slide Navigation */
+        .slide-nav {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .slide-nav button {
+            flex: 1;
+            padding: 8px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .slide-nav button:hover {
+            background: #333;
+        }
+
+        .slide-counter {
+            text-align: center;
+            color: #aaa;
+            margin: 10px 0;
+        }
+
+        /* Hidden Sections */
+        .hidden {
+            display: none !important;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #4CAF50;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 10px;
+            z-index: 1000;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        /* Firebase Config Section */
+        .firebase-config {
+            background: #2d2d44;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .firebase-config input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            background: #1a1a2e;
+            color: #fff;
+            font-family: monospace;
+        }
+
+        .firebase-config input::placeholder {
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📹 FLM Cam</h1>
+            <p>PPT Overlay Recording System - Record video dengan overlay PPT yang bisa di-resize</p>
+        </div>
+
+        <!-- Firebase Config (Hidden - using hardcoded config) -->
+        <div class="firebase-config hidden" id="firebaseConfigSection">
+            <h3>⚙️ Konfigurasi Firebase</h3>
+            <p style="color: #aaa; margin-bottom: 15px; font-size: 0.9rem;">Masukkan konfigurasi Firebase Anda untuk melanjutkan</p>
+            <input type="text" id="firebaseApiKey" placeholder="API Key">
+            <input type="text" id="firebaseProjectId" placeholder="Project ID">
+            <input type="text" id="firebaseStorageBucket" placeholder="Storage Bucket (mis: myproject.appspot.com)">
+            <button class="btn btn-primary" onclick="initializeFirebase()">Simpan & Mulai</button>
+            <p style="color: #888; font-size: 0.8rem; margin-top: 10px;">
+                ⚠️ Anda perlu membuat project di <a href="https://console.firebase.google.com" target="_blank" style="color: #667eea;">Firebase Console</a> 
+                dan mengaktifkan Realtime Database & Storage
+            </p>
+        </div>
+
+        <!-- Mode Selection -->
+        <div class="mode-selection" id="modeSelection">
+            <button class="mode-btn phone active" onclick="selectMode('phone')">📱 Mode HP (Kamera)</button>
+            <button class="mode-btn laptop" onclick="selectMode('laptop')">💻 Mode Laptop (Monitor)</button>
+        </div>
+
+        <!-- Session Info -->
+        <div class="session-info hidden" id="sessionInfo">
+            <p>Session ID:</p>
+            <div class="session-id" id="sessionIdDisplay">-</div>
+            <p style="margin-top: 10px; color: #aaa; font-size: 0.9rem;">
+                Bagikan ID ini ke perangkat lain untuk terhubung
+            </p>
+            <button class="btn btn-primary" style="width: auto; margin-top: 10px;" onclick="joinSession()">
+                Gabung Session
+            </button>
+            <input type="text" id="joinSessionId" placeholder="Masukkan Session ID" 
+                   style="width: 200px; padding: 8px; margin-left: 10px; border: 1px solid #444; 
+                          border-radius: 5px; background: #1a1a2e; color: #fff;">
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content hidden" id="mainContent">
+            <!-- Video Section -->
+            <div class="video-section">
+                <div class="video-container">
+                    <video id="videoElement" autoplay playsinline muted></video>
+                    <video id="remoteVideo" autoplay playsinline class="hidden"></video>
+                    
+                    <!-- PPT Overlay -->
+                    <div id="pptOverlay">
+                        <img id="pptImage" src="" alt="PPT Slide">
+                        <div class="resize-handle">↘</div>
+                    </div>
+                    
+                    <!-- Recording Indicator -->
+                    <div class="recording-indicator" id="recordingIndicator">
+                        <span>●</span> REC
+                    </div>
+                </div>
+
+                <!-- Phone Controls -->
+                <div id="phoneControls" class="hidden">
+                    <button class="btn btn-success" id="startCameraBtn" onclick="startCamera()">
+                        🎥 Mulai Kamera
+                    </button>
+                    <button class="btn btn-danger" id="recordBtn" onclick="toggleRecording()" disabled>
+                        ⏺ Mulai Rekam
+                    </button>
+                </div>
+
+                <!-- Laptop Controls -->
+                <div id="laptopControls" class="hidden">
+                    <button class="btn btn-primary" id="connectBtn" onclick="connectToPhone()">
+                        🔗 Sambung ke HP
+                    </button>
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <div class="controls-panel">
+                <!-- Status -->
+                <div class="panel-title">📊 Status</div>
+                <div class="status disconnected" id="statusIndicator">
+                    <div class="status-dot"></div>
+                    <span id="statusText">Tidak terhubung</span>
+                </div>
+
+                <!-- PPT Controls (Laptop only) -->
+                <div id="pptControls" class="hidden">
+                    <div class="panel-title">📊 Kontrol PPT</div>
+                    
+                    <div class="control-group">
+                        <label class="control-label">Upload Slide PPT</label>
+                        <div class="file-input-wrapper">
+                            <button class="btn btn-warning">📁 Pilih File Gambar</button>
+                            <input type="file" id="pptFileInput" accept="image/*" multiple onchange="handlePPTUpload(event)">
+                        </div>
+                        <p style="color: #666; font-size: 0.8rem; margin-top: 5px;">
+                            Upload gambar slide (PNG/JPG) satu per satu atau banyak sekaligus
+                        </p>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Slide Saat Ini</label>
+                        <div class="slide-counter" id="slideCounter">0 / 0</div>
+                        <div class="slide-nav">
+                            <button onclick="prevSlide()">◀</button>
+                            <button onclick="nextSlide()">▶</button>
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Ukuran PPT: <span id="scaleValue">100%</span></label>
+                        <input type="range" id="pptScale" min="10" max="200" value="100" oninput="updatePPTScale(this.value)">
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Opasitas (Transparansi): <span id="opacityValue">80%</span></label>
+                        <input type="range" id="pptOpacity" min="10" max="100" value="80" oninput="updatePPTOpacity(this.value)">
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Posisi X: <span id="posXValue">0</span></label>
+                        <input type="range" id="pptPosX" min="-500" max="500" value="0" oninput="updatePPTPosition()">
+                    </div>
+
+                    <div class="control-group">
+                        <label class="control-label">Posisi Y: <span id="posYValue">0</span></label>
+                        <input type="range" id="pptPosY" min="-300" max="300" value="0" oninput="updatePPTPosition()">
+                    </div>
+
+                    <button class="btn btn-primary" onclick="resetPPTPosition()">
+                        🔄 Reset Posisi
+                    </button>
+                </div>
+
+                <!-- Recording Info (Phone only) -->
+                <div id="recordingControls" class="hidden">
+                    <div class="panel-title">⏺ Info Rekaman</div>
+                    <p style="color: #aaa; font-size: 0.9rem;">
+                        Video akan disimpan di perangkat HP Anda setelah recording selesai.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast hidden" id="toast"></div>
+
+    <script>
+        // ==================== FIREBASE CONFIGURATION ====================
+        // Direct Firebase configuration - no need to input manually
+        const firebaseConfig = {
+            apiKey: "AIzaSyDwr0bJV06ctuuI615aWz5kGuZstP7ILug",
+            authDomain: "project-62a639d3-174c-4a7e-809.firebaseapp.com",
+            databaseURL: "https://project-62a639d3-174c-4a7e-809-default-rtdb.firebaseio.com",
+            projectId: "project-62a639d3-174c-4a7e-809",
+            storageBucket: "project-62a639d3-174c-4a7e-809.firebasestorage.app",
+            messagingSenderId: "882945089103",
+            appId: "1:882945089103:web:fa6e25327dd35c8884543a",
+            measurementId: "G-V0XWPCCGBW"
+        };
+
+        // ==================== GLOBAL VARIABLES ====================
+        let firebaseApp = null;
+        let db = null;
+        let storage = null;
+        let currentMode = null;
+        let mediaStream = null;
+        let mediaRecorder = null;
+        let recordedChunks = [];
+        let isRecording = false;
+
+        // PPT State
+        let pptSlides = [];
+        let currentSlideIndex = 0;
+        let pptState = {
+            visible: false,
+            scale: 1,
+            opacity: 0.8,
+            x: 0,
+            y: 0
+        };
+
+        // WebRTC
+        let peerConnection = null;
+        const iceServers = {
+            iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' }
+            ]
+        };
+
+        // Check if Firebase is already initialized
+        function checkFirebaseConfig() {
+            // Initialize Firebase directly with pre-configured values
+            initializeFirebase();
+        }
+
+        // ==================== FIREBASE ====================
+        function initializeFirebase() {
+            // Initialize Firebase with pre-configured config
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            db = firebase.database();
+            
+            // Try to get storage (may fail if not enabled)
+            try {
+                storage = firebase.storage();
+            } catch (e) {
+                console.log('Storage not available:', e);
+            }
+
+            // Hide config section and show main UI
+            document.getElementById('firebaseConfigSection').classList.add('hidden');
+            document.getElementById('sessionInfo').classList.remove('hidden');
+            
+            // Generate session ID
+            sessionId = generateSessionId();
+            document.getElementById('sessionIdDisplay').textContent = sessionId;
+            
+            console.log('Firebase initialized successfully!');
+        }
+
+        function generateSessionId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        // ==================== MODE SELECTION ====================
+        function selectMode(mode) {
+            currentMode = mode;
+            
+            // Update buttons
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelector(`.mode-btn.${mode}`).classList.add('active');
+
+            // Show/hide controls
+            document.getElementById('phoneControls').classList.toggle('hidden', mode !== 'phone');
+            document.getElementById('laptopControls').classList.toggle('hidden', mode !== 'laptop');
+            document.getElementById('pptControls').classList.toggle('hidden', mode !== 'laptop');
+            document.getElementById('recordingControls').classList.toggle('hidden', mode !== 'phone');
+
+            // Show main content
+            document.getElementById('mainContent').classList.remove('hidden');
+
+            // Make overlay draggable in laptop mode
+            document.getElementById('pptOverlay').classList.toggle('draggable', mode === 'laptop');
+        }
+
+        function joinSession() {
+            const joinId = document.getElementById('joinSessionId').value.trim().toUpperCase();
+            if (joinId) {
+                sessionId = joinId;
+                document.getElementById('sessionIdDisplay').textContent = sessionId;
+                showToast(`Bergabung ke session ${sessionId}`, 'success');
+                
+                if (currentMode === 'laptop') {
+                    connectToPhone();
+                }
+            }
+        }
+
+        // ==================== CAMERA (PHONE MODE) ====================
+        async function startCamera() {
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: true
+                });
+
+                const videoElement = document.getElementById('videoElement');
+                videoElement.srcObject = mediaStream;
+                
+                document.getElementById('startCameraBtn').disabled = true;
+                document.getElementById('recordBtn').disabled = false;
+
+                // Setup WebRTC for streaming
+                if (currentMode === 'phone') {
+                    setupPhonePeerConnection();
+                }
+
+                updateStatus('connected', 'Kamera aktif');
+                showToast('Kamera berhasil dimulai!', 'success');
+            } catch (error) {
+                console.error('Camera error:', error);
+                showToast('Gagal mengakses kamera: ' + error.message, 'error');
+            }
+        }
+
+        // ==================== RECORDING ====================
+        function toggleRecording() {
+            if (!isRecording) {
+                startRecording();
+            } else {
+                stopRecording();
+            }
+        }
+
+        function startRecording() {
+            if (!mediaStream) {
+                showToast('Mulai kamera terlebih dahulu!', 'error');
+                return;
+            }
+
+            // Create canvas stream with overlay
+            const canvas = document.createElement('canvas');
+            const video = document.getElementById('videoElement');
+            const overlay = document.getElementById('pptOverlay');
+            
+            canvas.width = video.videoWidth || 1280;
+            canvas.height = video.videoHeight || 720;
+            
+            const ctx = canvas.getContext('2d');
+
+            // Draw video frame
+            function drawFrame() {
+                if (!isRecording) return;
+                
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Draw overlay if visible
+                if (pptState.visible) {
+                    ctx.globalAlpha = pptState.opacity;
+                    const scale = pptState.scale;
+                    const x = pptState.x + (canvas.width - canvas.width * scale) / 2;
+                    const y = pptState.y + 20;
+                    
+                    const pptImg = document.getElementById('pptImage');
+                    if (pptImg.src && pptImg.complete) {
+                        ctx.drawImage(pptImg, x, y, canvas.width * scale, canvas.height * scale);
+                    }
+                    ctx.globalAlpha = 1;
+                }
+                
+                requestAnimationFrame(drawFrame);
+            }
+
+            // Create stream from canvas
+            const canvasStream = canvas.captureStream(30);
+            
+            // Add audio track
+            if (mediaStream.getAudioTracks().length > 0) {
+                canvasStream.addTrack(mediaStream.getAudioTracks()[0]);
+            }
+
+            mediaRecorder = new MediaRecorder(canvasStream, {
+                mimeType: 'video/webm;codecs=vp9'
+            });
+
+            recordedChunks = [];
+            
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data.size > 0) {
+                    recordedChunks.push(e.data);
+                }
+            };
+
+            mediaRecorder.onstop = saveRecording;
+
+            mediaRecorder.start(1000);
+            isRecording = true;
+
+            // Start drawing
+            drawFrame();
+
+            document.getElementById('recordBtn').textContent = '⏹ Stop Rekam';
+            document.getElementById('recordBtn').classList.remove('btn-success');
+            document.getElementById('recordBtn').classList.add('btn-danger');
+            document.getElementById('recordingIndicator').classList.add('active');
+            
+            updateStatus('connected', 'Merekam...');
+            showToast('Mulai merekam!', 'success');
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+            
+            isRecording = false;
+            
+            document.getElementById('recordBtn').textContent = '⏺ Mulai Rekam';
+            document.getElementById('recordBtn').classList.remove('btn-danger');
+            document.getElementById('recordBtn').classList.add('btn-success');
+            document.getElementById('recordingIndicator').classList.remove('active');
+            
+            updateStatus('connected', 'Kamera aktif');
+            showToast('Rekaman selesai!', 'success');
+        }
+
+        function saveRecording() {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            
+            // Create download link
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `FLM_Cam_${new Date().toISOString().replace(/[:.]/g, '-')}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            showToast('Video berhasil diunduh!', 'success');
+        }
+
+        // ==================== WEBRTC ====================
+        function setupPhonePeerConnection() {
+            peerConnection = new RTCPeerConnection(iceServers);
+            
+            // Add local tracks
+            mediaStream.getTracks().forEach(track => {
+                peerConnection.addTrack(track, mediaStream);
+            });
+
+            // Handle incoming tracks
+            peerConnection.ontrack = (event) => {
+                const remoteVideo = document.getElementById('remoteVideo');
+                remoteVideo.srcObject = event.streams[0];
+            };
+
+            // Handle ICE candidates
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    db.ref(`sessions/${sessionId}/phone_ice`).push(event.candidate.toJSON());
+                }
+            };
+
+            // Listen for laptop ICE
+            db.ref(`sessions/${sessionId}/laptop_ice`).on('child_added', async (snapshot) => {
+                await peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
+            });
+
+            // Create offer
+            peerConnection.createOffer().then(offer => {
+                peerConnection.setLocalDescription(offer);
+                db.ref(`sessions/${sessionId}`).update({
+                    phone_offer: offer,
+                    status: 'waiting'
+                });
+            });
+
+            // Listen for answer
+            db.ref(`sessions/${sessionId}/laptop_answer`).on('value', async (snapshot) => {
+                if (snapshot.val()) {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
+                }
+            });
+        }
+
+        async function connectToPhone() {
+            try {
+                peerConnection = new RTCPeerConnection(iceServers);
+
+                peerConnection.ontrack = (event) => {
+                    const remoteVideo = document.getElementById('remoteVideo');
+                    remoteVideo.srcObject = event.streams[0];
+                    remoteVideo.classList.remove('hidden');
+                    document.getElementById('videoElement').classList.add('hidden');
+                };
+
+                peerConnection.onicecandidate = (event) => {
+                    if (event.candidate) {
+                        db.ref(`sessions/${sessionId}/laptop_ice`).push(event.candidate.toJSON());
+                    }
+                };
+
+                // Listen for phone offer
+                db.ref(`sessions/${sessionId}/phone_offer`).once('value', async (snapshot) => {
+                    if (snapshot.val()) {
+                        await peerConnection.setRemoteDescription(new RTCSessionDescription(snapshot.val()));
+                        
+                        const answer = await peerConnection.createAnswer();
+                        await peerConnection.setLocalDescription(answer);
+                        
+                        db.ref(`sessions/${sessionId}`).update({ laptop_answer: answer });
+                    }
+                });
+
+                // Listen for phone ICE
+                db.ref(`sessions/${sessionId}/phone_ice`).on('child_added', async (snapshot) => {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(snapshot.val()));
+                });
+
+                updateStatus('connecting', 'Menyambungkan...');
+                showToast('Mencoba menyambungkan...', 'success');
+            } catch (error) {
+                console.error('Connection error:', error);
+                updateStatus('disconnected', 'Gagal menyambungkan');
+            }
+        }
+
+        // ==================== PPT CONTROLS ====================
+        function handlePPTUpload(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    pptSlides.push(e.target.result);
+                    updateSlideCounter();
+                    
+                    // Show first slide
+                    if (pptSlides.length === 1) {
+                        showSlide(0);
+                    }
+                    
+                    // Sync to Firebase
+                    syncPPTState();
+                    showToast(`Slide ${pptSlides.length} diupload!`, 'success');
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function showSlide(index) {
+            if (index >= 0 && index < pptSlides.length) {
+                currentSlideIndex = index;
+                document.getElementById('pptImage').src = pptSlides[index];
+                document.getElementById('pptOverlay').style.display = 'block';
+                pptState.visible = true;
+                updateSlideCounter();
+                syncPPTState();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlideIndex > 0) {
+                showSlide(currentSlideIndex - 1);
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlideIndex < pptSlides.length - 1) {
+                showSlide(currentSlideIndex + 1);
+            }
+        }
+
+        function updateSlideCounter() {
+            document.getElementById('slideCounter').textContent = 
+                `${currentSlideIndex + 1} / ${pptSlides.length}`;
+        }
+
+        function updatePPTScale(value) {
+            pptState.scale = value / 100;
+            document.getElementById('scaleValue').textContent = value + '%';
+            
+            const pptImg = document.getElementById('pptImage');
+            pptImg.style.width = (pptState.scale * 100) + '%';
+            
+            syncPPTState();
+        }
+
+        function updatePPTOpacity(value) {
+            pptState.opacity = value / 100;
+            document.getElementById('opacityValue').textContent = value + '%';
+            document.getElementById('pptImage').style.opacity = pptState.opacity;
+            syncPPTState();
+        }
+
+        function updatePPTPosition() {
+            pptState.x = parseInt(document.getElementById('pptPosX').value);
+            pptState.y = parseInt(document.getElementById('pptPosY').value);
+            
+            document.getElementById('posXValue').textContent = pptState.x;
+            document.getElementById('posYValue').textContent = pptState.y;
+            
+            document.getElementById('pptOverlay').style.transform = 
+                `translate(${pptState.x}px, ${pptState.y}px)`;
+            
+            syncPPTState();
+        }
+
+        function resetPPTPosition() {
+            pptState.scale = 1;
+            pptState.opacity = 0.8;
+            pptState.x = 0;
+            pptState.y = 0;
+            
+            document.getElementById('pptScale').value = 100;
+            document.getElementById('pptOpacity').value = 80;
+            document.getElementById('pptPosX').value = 0;
+            document.getElementById('pptPosY').value = 0;
+            
+            updatePPTScale(100);
+            updatePPTOpacity(80);
+            updatePPTPosition();
+            
+            showToast('Posisi PPT direset!', 'success');
+        }
+
+        // ==================== FIREBASE SYNC ====================
+        function syncPPTState() {
+            if (!db || !sessionId) return;
+            
+            db.ref(`sessions/${sessionId}/ppt`).update({
+                currentSlide: currentSlideIndex,
+                scale: pptState.scale,
+                opacity: pptState.opacity,
+                x: pptState.x,
+                y: pptState.y,
+                visible: pptState.visible
+            });
+        }
+
+        function listenForPPTUpdates() {
+            if (!db || !sessionId) return;
+            
+            db.ref(`sessions/${sessionId}/ppt`).on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (!data) return;
+                
+                // Update local state
+                pptState.scale = data.scale || 1;
+                pptState.opacity = data.opacity || 0.8;
+                pptState.x = data.x || 0;
+                pptState.y = data.y || 0;
+                
+                // Update UI
+                if (data.visible) {
+                    document.getElementById('pptOverlay').style.display = 'block';
+                }
+                
+                document.getElementById('pptScale').value = pptState.scale * 100;
+                document.getElementById('scaleValue').textContent = Math.round(pptState.scale * 100) + '%';
+                
+                document.getElementById('pptOpacity').value = pptState.opacity * 100;
+                document.getElementById('opacityValue').textContent = Math.round(pptState.opacity * 100) + '%';
+                
+                document.getElementById('pptPosX').value = pptState.x;
+                document.getElementById('posXValue').textContent = pptState.x;
+                document.getElementById('pptPosY').value = pptState.y;
+                document.getElementById('posYValue').textContent = pptState.y;
+                
+                // Apply styles
+                const pptImg = document.getElementById('pptImage');
+                pptImg.style.width = (pptState.scale * 100) + '%';
+                pptImg.style.opacity = pptState.opacity;
+                document.getElementById('pptOverlay').style.transform = 
+                    `translate(${pptState.x}px, ${pptState.y}px)`;
+            });
+        }
+
+        // ==================== DRAG FUNCTIONALITY ====================
+        let isDragging = false;
+        let dragStart = { x: 0, y: 0 };
+
+        const pptOverlay = document.getElementById('pptOverlay');
+
+        pptOverlay.addEventListener('mousedown', (e) => {
+            if (currentMode !== 'laptop') return;
+            isDragging = true;
+            dragStart = { x: e.clientX - pptState.x, y: e.clientY - pptState.y };
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging || currentMode !== 'laptop') return;
+            
+            pptState.x = e.clientX - dragStart.x;
+            pptState.y = e.clientY - dragStart.y;
+            
+            document.getElementById('pptPosX').value = pptState.x;
+            document.getElementById('posXValue').textContent = pptState.x;
+            document.getElementById('pptPosY').value = pptState.y;
+            document.getElementById('posYValue').textContent = pptState.y;
+            
+            document.getElementById('pptOverlay').style.transform = 
+                `translate(${pptState.x}px, ${pptState.y}px)`;
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                syncPPTState();
+            }
+        });
+
+        // ==================== UTILITIES ====================
+        function updateStatus(status, text) {
+            const indicator = document.getElementById('statusIndicator');
+            const statusText = document.getElementById('statusText');
+            
+            indicator.className = 'status ' + status;
+            statusText.textContent = text;
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.style.background = type === 'error' ? '#f44336' : '#4CAF50';
+            toast.classList.remove('hidden');
+            
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initialize
+        checkFirebaseConfig();
+    </script>
+</body>
+</html>
